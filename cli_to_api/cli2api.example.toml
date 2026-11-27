@@ -1,0 +1,43 @@
+# A complete example config. Copy it to cli2api.toml (or run `cli2api init`)
+# and keep only what you need.
+
+[server]
+host = "0.0.0.0"
+port = 8787
+api_keys = ["key-for-my-website", "key-for-my-mobile-app"]
+max_concurrency = 3
+timeout = 240
+default_provider = "claude"
+cors_origins = ["http://localhost:3000"]
+
+# Apps that only know OpenAI model names get routed to your CLIs.
+[aliases]
+"gpt-4o" = "claude"
+"gpt-4o-mini" = "claude/haiku"
+"local" = "ollama/qwen2.5"
+
+# Limit Claude Code to plain answers (one turn, no tool loops).
+[providers.claude]
+command = ["claude", "-p", "--output-format", "text", "--max-turns", "1"]
+
+# Not using this one on this machine:
+[providers.kimi]
+enabled = false
+
+# Any script or binary can become an endpoint.
+[providers.shout]
+label = "Uppercase bot (demo)"
+command = ["python", "-c", "import sys; print(sys.stdin.read().upper())"]
+
+# Pass the prompt as an argument instead of stdin.
+[providers.aider]
+label = "Aider"
+command = ["aider", "--no-git", "--no-pretty", "--yes-always", "--message", "{prompt}"]
+prompt_mode = "arg"
+timeout = 600
+
+# Proxy any OpenAI-compatible server too (LM Studio, vLLM, OpenRouter...).
+[providers.lmstudio]
+type = "openai"
+base_url = "http://localhost:1234/v1"
+default_model = "qwen2.5-7b-instruct"

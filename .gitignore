@@ -1,0 +1,11 @@
+.venv/
+venv/
+data/
+windows/stage/
+windows/*.exe
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.DS_Store
+Thumbs.db

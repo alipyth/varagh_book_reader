@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 340" width="1200" height="340">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0B1220"/>
+      <stop offset="55%" stop-color="#111C2E"/>
+      <stop offset="100%" stop-color="#16263D"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#5CC8E0"/>
+      <stop offset="100%" stop-color="#E3A92B"/>
+    </linearGradient>
+    <radialGradient id="glow1" cx="0.18" cy="0.25" r="0.5">
+      <stop offset="0%" stop-color="#5CC8E0" stop-opacity="0.22"/>
+      <stop offset="100%" stop-color="#5CC8E0" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="glow2" cx="0.85" cy="0.75" r="0.45">
+      <stop offset="0%" stop-color="#E3A92B" stop-opacity="0.18"/>
+      <stop offset="100%" stop-color="#E3A92B" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="1200" height="340" rx="22" fill="url(#bg)"/>
+  <rect width="1200" height="340" rx="22" fill="url(#glow1)"/>
+  <rect width="1200" height="340" rx="22" fill="url(#glow2)"/>
+  <rect x="1.5" y="1.5" width="1197" height="337" rx="21" fill="none" stroke="#263850" stroke-width="1.5"/>
+
+  <!-- Left decorative book + interactive curve icon -->
+  <g transform="translate(80,76)">
+    <rect x="0" y="0" width="184" height="188" rx="22" fill="#131F33" stroke="#2B4263" stroke-width="1.5"/>
+    <path d="M44 42 h68 l28 28 v76 a10 10 0 0 1 -10 10 H44 a10 10 0 0 1 -10 -10 V52 a10 10 0 0 1 10 -10 z" fill="#1E3350" stroke="#5CC8E0" stroke-width="2"/>
+    <path d="M112 42 v28 h28" fill="none" stroke="#E3A92B" stroke-width="2.5" stroke-linejoin="round"/>
+    <!-- Live math curve inside page -->
+    <path d="M52 132 Q 78 130, 92 104 T 130 84" fill="none" stroke="#E3A92B" stroke-width="3.2" stroke-linecap="round"/>
+    <path d="M52 138 L 130 96" fill="none" stroke="#5CC8E0" stroke-width="2" stroke-dasharray="5 4" stroke-linecap="round"/>
+    <circle cx="92" cy="104" r="5" fill="#E3A92B"/>
+    <circle cx="126" cy="86" r="4.5" fill="#5CC8E0"/>
+  </g>
+
+  <!-- Title & subtitle -->
+  <g transform="translate(305,108)" font-family="Segoe UI, system-ui, -apple-system, sans-serif">
+    <text x="0" y="0" fill="#FFFFFF" font-size="56" font-weight="800" letter-spacing="-1">Varagh <tspan fill="url(#accent)">Book Reader</tspan></text>
+    <text x="0" y="44" fill="#A9BBD0" font-size="22" font-weight="500">AI-Powered Bilingual Deep-Learning Reader · Bundled with CLI_to_API</text>
+    <text x="0" y="80" fill="#7C94B0" font-size="17">PDF · EPUB · TXT/MD · Web/ArXiv  |  Interactive KaTeX &amp; Live Plots  |  Socratic Tutor · X-Ray · Feynman · FSRS</text>
+
+    <!-- Feature pills -->
+    <g transform="translate(0,108)" font-size="13.5" font-weight="700">
+      <rect x="0" y="0" width="176" height="32" rx="16" fill="#13323C" stroke="#5CC8E0" stroke-opacity="0.5"/>
+      <text x="88" y="21" fill="#5CC8E0" text-anchor="middle">CLI_to_API Built-in</text>
+
+      <rect x="190" y="0" width="166" height="32" rx="16" fill="#3A2E17" stroke="#E3A92B" stroke-opacity="0.55"/>
+      <text x="273" y="21" fill="#F4D79A" text-anchor="middle">Interactive Math Lab</text>
+
+      <rect x="370" y="0" width="150" height="32" rx="16" fill="#16322A" stroke="#6CC79B" stroke-opacity="0.5"/>
+      <text x="445" y="21" fill="#6CC79B" text-anchor="middle">Ollama + OpenAI</text>
+
+      <rect x="534" y="0" width="146" height="32" rx="16" fill="#2B2340" stroke="#B79CEB" stroke-opacity="0.5"/>
+      <text x="607" y="21" fill="#B79CEB" text-anchor="middle">Obsidian + FSRS</text>
+    </g>
+  </g>
+</svg>
