@@ -20,8 +20,18 @@
 
 Drop a **PDF, EPUB, TXT, Markdown file, or Web/ArXiv URL** into Varagh and turn passive reading into an active, interactive learning lab: live streaming translation, interactive KaTeX formulas with tunable curve sliders, a spoiler-free Socratic tutor, Chapter X-Ray, Feynman checks, Devil's Advocate critiques, Concept Graphs, Information Density Heatmaps, Conceptual FSRS flashcards, and 1-click Obsidian export.
 
+## Screenshots
+
 <p align="center">
-  <img src="docs/assets/preview.jpg" alt="Varagh Book Reader Preview" width="92%">
+  <img src="docs/assets/screenshot-reader.jpg" alt="Varagh Interactive Reader, KaTeX Math Lab & Socratic Tutor" width="96%">
+  <br>
+  <sub><b>Interactive Reader:</b> Streaming Persian translation, KaTeX formula lab with everyday analogy &amp; clickable symbol chips, and resizable Socratic Tutor sidebar powered by <code>CLI_to_API</code>.</sub>
+</p>
+
+<p align="center">
+  <img src="docs/assets/screenshot-library.jpg" alt="Varagh Multi-Format Library" width="96%">
+  <br>
+  <sub><b>Library:</b> PDF, EPUB, TXT/MD, and Web/ArXiv articles with reading progress &amp; cover previews.</sub>
 </p>
 
 ---
