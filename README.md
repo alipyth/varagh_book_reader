@@ -77,6 +77,7 @@ On first run, Varagh creates `.venv`, installs dependencies, **automatically lau
 ## Key Features
 
 ### Reading & Multi-Format Ingestion
+- **English or Persian interface:** The app opens in English (left-to-right); switch to a Persian right-to-left interface under **Settings → Interface language**. Translations stay in Persian either way.
 - **Multi-format Library:** Import **PDF**, **EPUB**, **TXT**, **Markdown**, **Web Articles / ArXiv URLs**, or paste text directly.
 - **On-Demand Streaming Translation:** Nothing is translated until you click. Paragraph-by-paragraph (Side-by-side, Stacked, or Persian-only) and Whole-Page modes share the exact same SQLite cache.
 - **Smart Book Glossary & Word Lookup:** Extract consistent domain terminology and select any English word/phrase for contextual meaning, IPA pronunciation, and 1-click FSRS card creation.

@@ -4,13 +4,14 @@
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 const view = $("#view");
-const fa = n => (n ?? 0).toLocaleString("fa-IR");
+const fa = n => (n ?? 0).toLocaleString(LOCALE);   // locale-aware number (Persian digits only in the Persian UI)
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const LS = {
   get(k, d) { try { const v = localStorage.getItem("varagh." + k); return v === null ? d : JSON.parse(v); } catch { return d; } },
   set(k, v) { try { localStorage.setItem("varagh." + k, JSON.stringify(v)); } catch {} },
 };
 const ERR = "\u0000ERR:";
+const HEAT_LABEL = tr("🔥 چگالی", "🔥 Density");
 
 const ICON = {
   play: '<svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg>',
@@ -18,9 +19,9 @@ const ICON = {
   toc: '<svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h10M4 18h13"/></svg>',
   panel: '<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/></svg>',
   theme: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 0 0 16z" fill="currentColor"/></svg>',
-  back: '<svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>',
-  prev: '<svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>',
-  next: '<svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg>',
+  back: IS_FA ? '<svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>' : '<svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg>',
+  prev: IS_FA ? '<svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>' : '<svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg>',
+  next: IS_FA ? '<svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg>' : '<svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>',
   upload: '<svg viewBox="0 0 24 24"><path d="M12 16V4M6 10l6-6 6 6M4 20h16"/></svg>',
   graph: '<svg viewBox="0 0 24 24"><circle cx="6" cy="7" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="12" cy="18" r="2.5"/><path d="M8.3 8.2l2.6 7.5M15.6 7l-2.7 8.8M8.5 6.8l7-.6"/></svg>',
   mind: '<svg viewBox="0 0 24 24"><rect x="15" y="9.5" width="6" height="5" rx="1.5"/><rect x="3" y="3" width="6" height="4" rx="1.5"/><rect x="3" y="10" width="6" height="4" rx="1.5"/><rect x="3" y="17" width="6" height="4" rx="1.5"/><path d="M15 12h-2.5M12.5 5v14M12.5 5H9M12.5 12H9M12.5 19H9"/></svg>',
@@ -42,7 +43,7 @@ async function api(path, opts = {}) {
   const r = await fetch(path, o);
   let data = null;
   try { data = await r.json(); } catch {}
-  if (!r.ok) throw new Error((data && (typeof data.detail === "string" ? data.detail : JSON.stringify(data.detail))) || `خطای ${r.status}`);
+  if (!r.ok) throw new Error((data && (typeof data.detail === "string" ? data.detail : JSON.stringify(data.detail))) || tr(`خطای ${r.status}`, `Error ${r.status}`));
   return data;
 }
 
@@ -51,7 +52,7 @@ async function streamPost(url, signal, onDelta) {
   const r = await fetch(url, { method: "POST", signal });
   if (!r.ok) {
     let d = null; try { d = await r.json(); } catch {}
-    throw new Error((d && d.detail) || `خطای ${r.status}`);
+    throw new Error((d && d.detail) || tr(`خطای ${r.status}`, `Error ${r.status}`));
   }
   const meta = { provider: r.headers.get("X-Provider"), model: decodeURIComponent(r.headers.get("X-Model") || ""),
                  cached: r.headers.get("X-Cached") === "1", note: decodeURIComponent(r.headers.get("X-Note") || "") };
@@ -102,7 +103,7 @@ async function route() {
     else if (name === "stats") await Stats();
     else await Library();
   } catch (e) {
-    view.innerHTML = `<div class="pagewrap-main"><div class="error-box">${esc(e.message)}</div><a class="btn" href="#/">بازگشت به کتابخانه</a></div>`;
+    view.innerHTML = `<div class="pagewrap-main"><div class="error-box">${esc(e.message)}</div><a class="btn" href="#/">${tr(`بازگشت به کتابخانه`, `Back to library`)}</a></div>`;
   }
   refreshDue();
 }
@@ -120,60 +121,60 @@ async function Library() {
   const [books, { settings }] = await Promise.all([api("/api/books"), api("/api/settings")]);
   const needModel = !settings.tasks.translate_para.model;
   view.innerHTML = `<div class="pagewrap-main">
-    <div class="head"><div><h1>کتابخانه</h1><p>فایل PDF، EPUB، TXT/MD رها کن یا لینک مقاله اضافه کن. هیچ چیزی تا وقتی خودت نخواهی ترجمه نمی‌شود.</p></div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="add-url">+ مقاله / متن</button>
-      <label class="btn primary" for="file">${ICON.upload} افزودن کتاب</label><input type="file" id="file" accept=".pdf,.epub,.txt,.md,application/pdf,application/epub+zip,text/plain,text/markdown" hidden multiple></div></div>
-    ${needModel ? `<div class="banner"><span>هنوز مدلی برای ترجمه انتخاب نکرده‌ای. بدون آن، کلیک روی پاراگراف کاری نمی‌کند.</span><a class="btn sm" href="#/settings">انتخاب مدل</a></div>` : ""}
+    <div class="head"><div><h1>${tr("کتابخانه", "Library")}</h1><p>${tr(`فایل PDF، EPUB، TXT/MD رها کن یا لینک مقاله اضافه کن. هیچ چیزی تا وقتی خودت نخواهی ترجمه نمی‌شود.`, `Drop a PDF, EPUB or TXT/MD file, or add an article link. Nothing is translated until you ask.`)}</p></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="add-url">${tr(`+ مقاله / متن`, `+ Article / text`)}</button>
+      <label class="btn primary" for="file">${ICON.upload} ${tr("افزودن کتاب", "Add book")}</label><input type="file" id="file" accept=".pdf,.epub,.txt,.md,application/pdf,application/epub+zip,text/plain,text/markdown" hidden multiple></div></div>
+    ${needModel ? `<div class="banner"><span>${tr(`هنوز مدلی برای ترجمه انتخاب نکرده‌ای. بدون آن، کلیک روی پاراگراف کاری نمی‌کند.`, `You haven't picked a translation model yet. Without one, clicking a paragraph does nothing.`)}</span><a class="btn sm" href="#/settings">${tr(`انتخاب مدل`, `Choose model`)}</a></div>` : ""}
     <div id="upmsg" class="small muted" hidden></div>
     <div id="shelf"></div></div>
-    <div class="dropzone" id="dz" hidden>PDF / EPUB / TXT را رها کن</div>`;
+    <div class="dropzone" id="dz" hidden>${tr(`PDF / EPUB / TXT را رها کن`, `Drop a PDF / EPUB / TXT`)}</div>`;
 
   const shelf = $("#shelf");
   if (!books.length) {
     shelf.innerHTML = `<div class="empty">
-      <div><h2 style="margin-bottom:14px">اولین کتابت را اضافه کن</h2><ol>
-        <li>در <a href="#/settings">تنظیمات</a> آدرس Ollama و کلید OpenAI را بده و برای هر کار مدل انتخاب کن.</li>
-        <li>یک PDF متنی را اینجا بکش یا دکمه‌ی «افزودن کتاب» را بزن.</li>
-        <li>کتاب را باز کن؛ روی هر پاراگراف کلیک کنی ترجمه می‌شود، یا کل صفحه را یکجا ترجمه کن.</li></ol></div>
-      <div class="demo" aria-label="نمونه"><div>وقتی صفحه‌های پیش رو را نوشتم، تنها در جنگل زندگی می‌کردم، یک مایل دور از هر همسایه‌ای.</div>
+      <div><h2 style="margin-bottom:14px">${tr(`اولین کتابت را اضافه کن`, `Add your first book`)}</h2><ol>
+        <li>${tr(`در <a href="#/settings">تنظیمات</a> آدرس Ollama و کلید OpenAI را بده و برای هر کار مدل انتخاب کن.`, `In <a href="#/settings">Settings</a>, enter your Ollama address and OpenAI key, and pick a model for each task.`)}</li>
+        <li>${tr(`یک PDF متنی را اینجا بکش یا دکمه‌ی «افزودن کتاب» را بزن.`, `Drag a text PDF here, or press “Add book”.`)}</li>
+        <li>${tr(`کتاب را باز کن؛ روی هر پاراگراف کلیک کنی ترجمه می‌شود، یا کل صفحه را یکجا ترجمه کن.`, `Open the book; click any paragraph to translate it, or translate the whole page at once.`)}</li></ol></div>
+      <div class="demo" aria-label="${tr("نمونه", "Example")}"><div dir="rtl" lang="fa">وقتی صفحه‌های پیش رو را نوشتم، تنها در جنگل زندگی می‌کردم، یک مایل دور از هر همسایه‌ای.</div>
         <div class="en" dir="ltr">When I wrote the following pages, I lived alone, in the woods, a mile from any neighbor.</div></div></div>`;
   } else {
     const last = books.find(b => b.opened && b.status === "ready");
     if (last) {
       const pct = Math.round((last.last_page / last.pages) * 100);
       shelf.insertAdjacentHTML("beforebegin", `<div class="hero">
-        <a class="cover" href="#/read/${last.id}/${last.last_page}" aria-label="ادامه‌ی ${esc(last.title)}"><img src="/api/books/${last.id}/cover" alt=""></a>
-        <div class="info"><span class="eyebrow">ادامه‌ی خواندن</span><h2 dir="auto">${esc(last.title)}</h2>${last.author ? `<div class="muted small" dir="ltr" style="text-align:right">${esc(last.author)}</div>` : ""}
+        <a class="cover" href="#/read/${last.id}/${last.last_page}" aria-label="${tr(`ادامه‌ی ${esc(last.title)}`, `Continue ${esc(last.title)}`)}"><img src="/api/books/${last.id}/cover" alt=""></a>
+        <div class="info"><span class="eyebrow">${tr(`ادامه‌ی خواندن`, `Continue reading`)}</span><h2 dir="auto">${esc(last.title)}</h2>${last.author ? `<div class="muted small" dir="ltr" style="text-align:start">${esc(last.author)}</div>` : ""}
           <div class="progress"><i style="width:${pct}%"></i></div>
-          <div class="kv"><span>صفحه‌ی ${fa(last.last_page)} از ${fa(last.pages)}</span><span>${fa(pct)}٪</span></div>
-          <div><a class="btn go" href="#/read/${last.id}/${last.last_page}">${ICON.play} ادامه از صفحه‌ی ${fa(last.last_page)}</a></div></div></div>
-        <div class="sect">همه‌ی کتاب‌ها · ${fa(books.length)}</div>`);
+          <div class="kv"><span>${tr(`صفحه‌ی ${fa(last.last_page)} از ${fa(last.pages)}`, `Page ${fa(last.last_page)} of ${fa(last.pages)}`)}</span><span>${fa(pct)}${PCT}</span></div>
+          <div><a class="btn go" href="#/read/${last.id}/${last.last_page}">${ICON.play} ${tr(`ادامه از صفحه‌ی ${fa(last.last_page)}`, `Continue from page ${fa(last.last_page)}`)}</a></div></div></div>
+        <div class="sect">${tr(`همه‌ی کتاب‌ها · ${fa(books.length)}`, `All books · ${fa(books.length)}`)}</div>`);
     }
     shelf.className = "shelf";
     shelf.innerHTML = books.map(b => {
       const pct = b.pages ? Math.round((b.last_page / b.pages) * 100) : 0;
       const ready = b.status === "ready";
-      const state = b.status === "ingesting" ? `<div class="state">در حال آماده‌سازی…</div>` : b.status === "error" ? `<div class="state">${esc(b.error)}</div>` : "";
+      const state = b.status === "ingesting" ? `<div class="state">${tr(`در حال آماده‌سازی…`, `Preparing…`)}</div>` : b.status === "error" ? `<div class="state">${esc(b.error)}</div>` : "";
       return `<div class="book">
-        ${ready ? `<a class="cover" href="#/read/${b.id}/${b.last_page}" aria-label="باز کردن ${esc(b.title)}"><img src="/api/books/${b.id}/cover" alt="" loading="lazy"></a>`
+        ${ready ? `<a class="cover" href="#/read/${b.id}/${b.last_page}" aria-label="${tr(`باز کردن ${esc(b.title)}`, `Open ${esc(b.title)}`)}"><img src="/api/books/${b.id}/cover" alt="" loading="lazy"></a>`
           : `<div class="cover">${state}</div>`}
         <div><h2 title="${esc(b.title)}">${esc(b.title)}</h2>${b.author ? `<div class="by">${esc(b.author)}</div>` : ""}</div>
         ${ready ? `<div class="progress"><i style="width:${pct}%"></i></div>` : ""}
-        <div class="meta"><span>${ready ? `ص ${fa(b.last_page)} از ${fa(b.pages)} · ${fa(b.translated_pct)}٪ ترجمه` : ""}</span>
-          <button class="btn ghost sm danger" data-del="${b.id}">حذف</button></div></div>`;
+        <div class="meta"><span>${ready ? `${tr(`ص ${fa(b.last_page)} از ${fa(b.pages)} · ${fa(b.translated_pct)}٪ ترجمه`, `p. ${fa(b.last_page)} of ${fa(b.pages)} · ${fa(b.translated_pct)}% translated`)}` : ""}</span>
+          <button class="btn ghost sm danger" data-del="${b.id}">${tr("حذف", "Delete")}</button></div></div>`;
     }).join("");
   }
 
   $$("[data-del]").forEach(btn => btn.addEventListener("click", async () => {
-    if (btn.dataset.sure !== "1") { btn.dataset.sure = "1"; btn.textContent = "مطمئنی؟"; setTimeout(() => { btn.dataset.sure = ""; btn.textContent = "حذف"; }, 3000); return; }
-    await api(`/api/books/${btn.dataset.del}`, { method: "DELETE" }); toast("کتاب حذف شد"); route();
+    if (btn.dataset.sure !== "1") { btn.dataset.sure = "1"; btn.textContent = tr("مطمئنی؟", "Sure?"); setTimeout(() => { btn.dataset.sure = ""; btn.textContent = tr("حذف", "Delete"); }, 3000); return; }
+    await api(`/api/books/${btn.dataset.del}`, { method: "DELETE" }); toast(tr("کتاب حذف شد", "Book deleted")); route();
   }));
 
   const upload = async files => {
     const msg = $("#upmsg");
     for (const f of files) {
-      if (!/\.(pdf|epub|txt|md)$/i.test(f.name)) { toast("فرمت مجاز: PDF، EPUB، TXT یا MD", true); continue; }
-      msg.hidden = false; msg.textContent = `در حال بارگذاری ${f.name}…`;
+      if (!/\.(pdf|epub|txt|md)$/i.test(f.name)) { toast(tr("فرمت مجاز: PDF، EPUB، TXT یا MD", "Allowed formats: PDF, EPUB, TXT or MD"), true); continue; }
+      msg.hidden = false; msg.textContent = tr(`در حال بارگذاری ${f.name}…`, `Uploading ${f.name}…`);
       const fd = new FormData(); fd.append("file", f);
       try { await api("/api/books", { method: "POST", body: fd }); } catch (e) { toast(e.message, true); }
     }
@@ -197,7 +198,7 @@ async function Library() {
 /* ---------------------------------------------------------------- reader */
 async function Reader(bookId, pageArg) {
   const [book, { settings }] = await Promise.all([api(`/api/books/${bookId}`), api("/api/settings")]);
-  if (book.status !== "ready") throw new Error(book.error || "کتاب هنوز آماده نیست");
+  if (book.status !== "ready") throw new Error(book.error || tr("کتاب هنوز آماده نیست", "The book isn't ready yet"));
   const S = {
     page: Math.min(pageArg || book.last_page || 1, book.pages),
     mode: LS.get("mode", "para"), layout: LS.get("layout", "side"), rt: LS.get("rt", "auto"),
@@ -214,48 +215,48 @@ async function Reader(bookId, pageArg) {
 
   view.innerHTML = `<div class="reader" id="reader">
     <header class="rtop">
-      <a class="btn icon ghost" href="#/" title="کتابخانه" aria-label="کتابخانه">${ICON.back}</a>
-      <button class="btn icon ghost" id="tDrawer" title="فهرست مطالب" aria-label="فهرست مطالب">${ICON.toc}</button>
+      <a class="btn icon ghost" href="#/" title="${tr("کتابخانه", "Library")}" aria-label="${tr("کتابخانه", "Library")}">${ICON.back}</a>
+      <button class="btn icon ghost" id="tDrawer" title="${tr("فهرست مطالب", "Contents")}" aria-label="${tr("فهرست مطالب", "Contents")}">${ICON.toc}</button>
       <div class="title"><b dir="auto" title="${esc(book.title)}">${esc(book.title)}</b><span>${esc(book.author || "")}</span></div>
-      <div class="seg" id="mode" role="group" aria-label="نوع ترجمه"><button data-v="para">پاراگرافی</button><button data-v="page">صفحه‌ای</button></div>
-      <div class="seg" id="layout" role="group" aria-label="چیدمان"><button data-v="side">کنار هم</button><button data-v="stack">زیر هم</button><button data-v="fa">فقط فارسی</button></div>
+      <div class="seg" id="mode" role="group" aria-label="${tr("نوع ترجمه", "Translation mode")}"><button data-v="para">${tr("پاراگرافی", "Paragraph")}</button><button data-v="page">${tr("صفحه‌ای", "Page")}</button></div>
+      <div class="seg" id="layout" role="group" aria-label="${tr("چیدمان", "Layout")}"><button data-v="side">${tr("کنار هم", "Side by side")}</button><button data-v="stack">${tr("زیر هم", "Stacked")}</button><button data-v="fa">${tr("فقط فارسی", "Persian only")}</button></div>
       <span class="grow"></span>
-      <div class="studybtns" role="group" aria-label="ابزارهای مطالعه‌ی عمیق">
-        <button class="btn sm primary" id="oDeep" title="پیش‌خوانی X-Ray، آزمون فاینمن، نقد کتاب، گراف مفاهیم، نقشه‌ی ذهنی و سؤال‌ها">🧠 مطالعه‌ی عمیق</button>
-        <button class="btn sm ghost" id="tHeat" title="رنگ‌بندی پاراگراف‌ها بر اساس چگالی اطلاعات (محوری / مثال / تکرار)">🔥 چگالی</button>
-        <button class="btn sm ghost" id="tCore" hidden title="فقط پاراگراف‌های محوری را نشان بده">فقط محوری</button>
+      <div class="studybtns" role="group" aria-label="${tr("ابزارهای مطالعه‌ی عمیق", "Deep study tools")}">
+        <button class="btn sm primary" id="oDeep" title="${tr("پیش‌خوانی X-Ray، آزمون فاینمن، نقد کتاب، گراف مفاهیم، نقشه‌ی ذهنی و سؤال‌ها", "Chapter X-ray, Feynman test, critique, concept graph, mind map and questions")}">${tr("🧠 مطالعه‌ی عمیق", "🧠 Deep study")}</button>
+        <button class="btn sm ghost" id="tHeat" title="${tr("رنگ‌بندی پاراگراف‌ها بر اساس چگالی اطلاعات (محوری / مثال / تکرار)", "Color paragraphs by information density (core / example / filler)")}">${HEAT_LABEL}</button>
+        <button class="btn sm ghost" id="tCore" hidden title="${tr("فقط پاراگراف‌های محوری را نشان بده", "Show only core paragraphs")}">${tr("فقط محوری", "Core only")}</button>
       </div>
       <button class="btn go" id="bigBtn"></button>
-      <button class="btn icon ghost" id="smaller" title="متن کوچک‌تر" aria-label="متن کوچک‌تر">A−</button>
-      <button class="btn icon ghost" id="bigger" title="متن بزرگ‌تر" aria-label="متن بزرگ‌تر">A+</button>
-      <button class="btn icon ghost" id="theme" title="پوسته‌ی خواندن" aria-label="پوسته‌ی خواندن">${ICON.theme}</button>
-      <button class="btn sm" id="tTools" title="باز و بسته کردن پنل دستیار و ابزارهای صفحه">💬 دستیار</button>
+      <button class="btn icon ghost" id="smaller" title="${tr("متن کوچک‌تر", "Smaller text")}" aria-label="${tr("متن کوچک‌تر", "Smaller text")}">A−</button>
+      <button class="btn icon ghost" id="bigger" title="${tr("متن بزرگ‌تر", "Larger text")}" aria-label="${tr("متن بزرگ‌تر", "Larger text")}">A+</button>
+      <button class="btn icon ghost" id="theme" title="${tr("پوسته‌ی خواندن", "Reading theme")}" aria-label="${tr("پوسته‌ی خواندن", "Reading theme")}">${ICON.theme}</button>
+      <button class="btn sm" id="tTools" title="${tr("باز و بسته کردن پنل دستیار و ابزارهای صفحه", "Toggle the assistant and page tools panel")}">${tr("💬 دستیار", "💬 Assistant")}</button>
     </header>
-    <aside class="drawer" id="drawer"><div class="drawer-head"><b>فهرست مطالب</b><button class="btn icon ghost" id="closeDrawer" aria-label="بستن فهرست">${ICON.close}</button></div><div class="toc" id="toc"></div></aside>
+    <aside class="drawer" id="drawer"><div class="drawer-head"><b>${tr("فهرست مطالب", "Contents")}</b><button class="btn icon ghost" id="closeDrawer" aria-label="${tr("بستن فهرست", "Close contents")}">${ICON.close}</button></div><div class="toc" id="toc"></div></aside>
     <section class="canvas" id="canvas"></section>
     <section class="overlay" id="overlay" hidden></section>
     <div class="welcome" id="welcome" hidden></div>
     <aside class="tools" id="tools">
-      <div class="tools-resizer" id="toolsResizer" title="بکش برای تغییر عرض پنل"></div>
-      <div class="tools-head"><b>ابزارهای این صفحه</b>
+      <div class="tools-resizer" id="toolsResizer" title="${tr("بکش برای تغییر عرض پنل", "Drag to resize the panel")}"></div>
+      <div class="tools-head"><b>${tr("ابزارهای این صفحه", "Page tools")}</b>
         <div style="display:flex;gap:4px;align-items:center">
-          <button class="btn sm ghost" id="expandTools" title="بزرگ / کوچک کردن عرض پنل">⤢ بزرگ</button>
-          <button class="btn sm ghost" id="closeTools" aria-label="بستن پنل">× بستن</button>
+          <button class="btn sm ghost" id="expandTools" title="${tr("بزرگ / کوچک کردن عرض پنل", "Widen / narrow the panel")}">${tr("⤢ بزرگ", "⤢ Wider")}</button>
+          <button class="btn sm ghost" id="closeTools" aria-label="${tr("بستن پنل", "Close panel")}">${tr("× بستن", "× Close")}</button>
         </div>
       </div>
       <div class="tabs" role="tablist">
-        <button data-tab="tutor">💬 گفت‌وگو با صفحه</button>
-        <button data-tab="brain">🔗 بین‌کتابی و Obsidian</button>
-        <button data-tab="gloss">📖 واژه‌نامه</button>
-        <button data-tab="review">📊 مرور و مصرف</button>
+        <button data-tab="tutor">${tr(`💬 گفت‌وگو با صفحه`, `💬 Chat with page`)}</button>
+        <button data-tab="brain">${tr(`🔗 بین‌کتابی و Obsidian`, `🔗 Cross-book & Obsidian`)}</button>
+        <button data-tab="gloss">${tr(`📖 واژه‌نامه`, `📖 Glossary`)}</button>
+        <button data-tab="review">${tr(`📊 مرور و مصرف`, `📊 Review & usage`)}</button>
       </div>
       <div class="tabpane" id="tabpane"></div>
     </aside>
     <footer class="rbottom">
-      <button class="btn icon ghost" id="prev" title="صفحه‌ی قبل (کلید →)" aria-label="صفحه‌ی قبل">${ICON.prev}</button>
-      <input type="range" id="scrub" min="1" max="${book.pages}" aria-label="صفحه">
-      <button class="btn icon ghost" id="next" title="صفحه‌ی بعد (کلید ←)" aria-label="صفحه‌ی بعد">${ICON.next}</button>
-      <span class="pg">صفحه <input type="number" id="pin" min="1" max="${book.pages}" aria-label="شماره‌ی صفحه"> از ${fa(book.pages)}</span>
+      <button class="btn icon ghost" id="prev" title="${tr("صفحه‌ی قبل (کلید →)", "Previous page (← key)")}" aria-label="${tr("صفحه‌ی قبل", "Previous page")}">${ICON.prev}</button>
+      <input type="range" id="scrub" min="1" max="${book.pages}" aria-label="${tr("صفحه", "Page")}">
+      <button class="btn icon ghost" id="next" title="${tr("صفحه‌ی بعد (کلید ←)", "Next page (→ key)")}" aria-label="${tr("صفحه‌ی بعد", "Next page")}">${ICON.next}</button>
+      <span class="pg">${tr("صفحه", "Page")} <input type="number" id="pin" min="1" max="${book.pages}" aria-label="${tr("شماره‌ی صفحه", "Page number")}"> ${tr("از", "of")} ${fa(book.pages)}</span>
       <span id="hlchip"></span>
       <span class="stat" id="stat"></span>
       <span id="who"></span>
@@ -278,8 +279,8 @@ async function Reader(bookId, pageArg) {
   $$("#layout button").forEach(b => b.onclick = () => { S.layout = b.dataset.v; LS.set("layout", S.layout); applyChrome(); render(); });
   $("#smaller").onclick = () => { S.fs = Math.max(.9, +(S.fs - .06).toFixed(2)); LS.set("fs", S.fs); applyChrome(); };
   $("#bigger").onclick = () => { S.fs = Math.min(1.7, +(S.fs + .06).toFixed(2)); LS.set("fs", S.fs); applyChrome(); };
-  const themes = ["auto", "day", "sepia", "night"], themeNames = { auto: "مثل سیستم", day: "روز", sepia: "کاغذی", night: "شب" };
-  $("#theme").onclick = () => { S.rt = themes[(themes.indexOf(S.rt) + 1) % themes.length]; LS.set("rt", S.rt); applyChrome(); toast("پوسته: " + themeNames[S.rt]); };
+  const themes = ["auto", "day", "sepia", "night"], themeNames = { auto: tr("مثل سیستم", "System"), day: tr("روز", "Day"), sepia: tr("کاغذی", "Sepia"), night: tr("شب", "Night") };
+  $("#theme").onclick = () => { S.rt = themes[(themes.indexOf(S.rt) + 1) % themes.length]; LS.set("rt", S.rt); applyChrome(); toast(tr("پوسته: ", "Theme: ") + themeNames[S.rt]); };
   $("#tDrawer").onclick = () => { S.drawer = !S.drawer; LS.set("drawer", S.drawer); applyChrome(); };
   $("#closeDrawer").onclick = () => { S.drawer = false; LS.set("drawer", false); applyChrome(); };
   $("#tTools").onclick = () => { S.tools = !S.tools; LS.set("tools", S.tools); applyChrome(); if (S.tools) renderTab(); };
@@ -290,7 +291,7 @@ async function Reader(bookId, pageArg) {
   const applyToolsW = w => {
     toolsW = Math.max(320, Math.min(Math.round(innerWidth * 0.82), w));
     toolsEl.style.width = toolsW + "px";
-    $("#expandTools").textContent = toolsW >= 620 ? "⤡ معمولی" : "⤢ بزرگ";
+    $("#expandTools").textContent = toolsW >= 620 ? tr("⤡ معمولی", "⤡ Normal") : tr("⤢ بزرگ", "⤢ Wider");
   };
   applyToolsW(toolsW);
   $("#expandTools").onclick = () => { applyToolsW(toolsW >= 620 ? 420 : Math.min(760, Math.round(innerWidth * 0.58))); LS.set("toolsW", toolsW); };
@@ -316,13 +317,13 @@ async function Reader(bookId, pageArg) {
     if (!data) return;
     if (S.heatOn) { S.heatOn = false; S.onlyCore = false; $("#tHeat").classList.remove("primary"); $("#tCore").hidden = true; render(); return; }
     if (!data.heatmap) {
-      $("#tHeat").disabled = true; $("#tHeat").textContent = "🔥 در حال تحلیل…";
+      $("#tHeat").disabled = true; $("#tHeat").textContent = tr("🔥 در حال تحلیل…", "🔥 Analyzing…");
       try {
         const r = await api(`/api/books/${bookId}/pages/${S.page}/heatmap`, { method: "POST" });
         data.heatmap = r.heatmap?.items || {};
         refreshUsage();
-      } catch (e) { toast(e.message, true); $("#tHeat").disabled = false; $("#tHeat").textContent = "🔥 چگالی"; return; }
-      $("#tHeat").disabled = false; $("#tHeat").textContent = "🔥 چگالی";
+      } catch (e) { toast(e.message, true); $("#tHeat").disabled = false; $("#tHeat").textContent = HEAT_LABEL; return; }
+      $("#tHeat").disabled = false; $("#tHeat").textContent = HEAT_LABEL;
     }
     S.heatOn = true; $("#tHeat").classList.add("primary"); $("#tCore").hidden = false; render();
   };
@@ -339,8 +340,9 @@ async function Reader(bookId, pageArg) {
       if (S.tools && innerWidth <= 1100) { S.tools = false; applyChrome(); return; }
     }
     if (["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement?.tagName)) return;
-    if (e.key === "ArrowLeft") go(S.page + 1);
-    else if (e.key === "ArrowRight") go(S.page - 1);
+    // Arrow keys follow reading direction: in RTL, ← is the next page.
+    if (e.key === "ArrowLeft") go(IS_FA ? S.page + 1 : S.page - 1);
+    else if (e.key === "ArrowRight") go(IS_FA ? S.page - 1 : S.page + 1);
   };
   document.addEventListener("keydown", keys);
   onLeave(() => { alive = false; stopAll(); document.removeEventListener("keydown", keys); });
@@ -360,7 +362,7 @@ async function Reader(bookId, pageArg) {
     let cur = -1; toc.forEach((t, i) => { if (t[2] <= S.page) cur = i; });
     $("#toc").innerHTML = toc.length ? toc.map((t, i) =>
       `<a href="#" data-p="${t[2]}" class="l${t[0]} ${i === cur ? "cur" : ""}" style="padding-inline-start:${Math.min(4, Math.max(0, t[0] - 1)) * 12 + 10}px"><b dir="auto">${esc(t[1])}</b><span>${fa(t[2])}</span></a>`).join("")
-      : `<p class="small muted">این کتاب فهرست مطالب ندارد.</p>`;
+      : `<p class="small muted">${tr(`این کتاب فهرست مطالب ندارد.`, `This book has no table of contents.`)}</p>`;
     $$("#toc a").forEach(a => a.onclick = e => { e.preventDefault(); go(+a.dataset.p); if (innerWidth < 900) { S.drawer = false; applyChrome(); } });
   }
 
@@ -380,7 +382,7 @@ async function Reader(bookId, pageArg) {
   }
 
   /* --- top-bar state */
-  function whoFor(t) { const x = task[t]; return x && x.model ? `<a href="#/settings" style="text-decoration:none" title="تغییر مدل در تنظیمات">${providerPill(x.provider, x.model)}</a>` : `<a class="pill err" href="#/settings">مدل انتخاب نشده</a>`; }
+  function whoFor(t) { const x = task[t]; return x && x.model ? `<a href="#/settings" style="text-decoration:none" title="${tr("تغییر مدل در تنظیمات", "Change the model in Settings")}">${providerPill(x.provider, x.model)}</a>` : `<a class="pill err" href="#/settings">${tr(`مدل انتخاب نشده`, `No model selected`)}</a>`; }
   function updateBar() {
     const big = $("#bigBtn");
     if (!data) return;
@@ -389,15 +391,15 @@ async function Reader(bookId, pageArg) {
       const busy = Q.cur || Q.list.length || pageCtrl;
       $("#who").innerHTML = whoFor("translate_para");
       big.hidden = !busy && !left;
-      big.innerHTML = busy ? `${ICON.stop} توقف` : `${ICON.play} ترجمه‌ی همه‌ی پاراگراف‌ها <span class="small">(${fa(left)})</span>`;
+      big.innerHTML = busy ? `${ICON.stop} ${tr("توقف", "Stop")}` : `${ICON.play} ${tr("ترجمه‌ی همه‌ی پاراگراف‌ها", "Translate all paragraphs")} <span class="small">(${fa(left)})</span>`;
       big.onclick = busy ? stopAll : translateAll;
       const done = data.paragraphs.filter(p => p.base || p.kind === "raw").length;
-      $("#stat").textContent = data.paragraphs.length ? `${fa(done)} از ${fa(data.paragraphs.length)} پاراگراف این صفحه ترجمه شده` : "";
+      $("#stat").textContent = data.paragraphs.length ? tr(`${fa(done)} از ${fa(data.paragraphs.length)} پاراگراف این صفحه ترجمه شده`, `${fa(done)} of ${fa(data.paragraphs.length)} paragraphs on this page translated`) : "";
     } else {
       $("#who").innerHTML = whoFor("translate_page");
       big.hidden = !pageCtrl;
-      big.innerHTML = `${ICON.stop} توقف`; big.onclick = stopAll;
-      $("#stat").textContent = data.page_translation ? "این صفحه ترجمه شده" : "";
+      big.innerHTML = `${ICON.stop} ${tr("توقف", "Stop")}`; big.onclick = stopAll;
+      $("#stat").textContent = data.page_translation ? tr("این صفحه ترجمه شده", "This page is translated") : "";
     }
   }
 
@@ -410,8 +412,8 @@ async function Reader(bookId, pageArg) {
 
   /* --- paragraph mode */
   const live = {};  // pid -> {state:'queued'|'live'|'error', text, error}
-  const HM_FA = { core: "🟡 محوری", example: "🔵 مثال", fluff: "⚪ تکرار/حاشیه" };
-  const DE_LVLS = [["eli5", "شهودی"], ["technical", "فنی"], ["compare", "مقایسه"], ["analogy", "قیاس با حوزه‌ی من"]];
+  const HM_FA = { core: tr("🟡 محوری", "🟡 Core"), example: tr("🔵 مثال", "🔵 Example"), fluff: tr("⚪ تکرار/حاشیه", "⚪ Repetition / aside") };
+  const DE_LVLS = [["eli5", tr("شهودی", "Intuitive")], ["technical", tr("فنی", "Technical")], ["compare", tr("مقایسه", "Compare")], ["analogy", tr("قیاس با حوزه‌ی من", "Analogy to my field")]];
   function deepExpHtml(p) {
     const st = DEXP[p.id];
     const hasAny = p.deep_explains && Object.keys(p.deep_explains).length;
@@ -420,7 +422,7 @@ async function Reader(bookId, pageArg) {
     const active = st?.active || Object.keys(p.deep_explains || {})[0] || "eli5";
     const text = st?.live != null ? st.live : (p.deep_explains?.[active] || "");
     return `<div class="dexp-bar">${DE_LVLS.map(([k, l]) => `<button class="btn sm ${active === k ? "primary" : "ghost"}" data-dexp="${k}">${l}</button>`).join("")}
-      <button class="btn sm ghost" data-dexp-close title="بستن توضیح">×</button></div>
+      <button class="btn sm ghost" data-dexp-close title="${tr("بستن توضیح", "Close explanation")}">×</button></div>
       ${text || st?.live != null ? `<div class="dexp-box">${renderMd(text)}${st?.live != null ? '<span class="caret"></span>' : ""}</div>` : ""}`;
   }
   function rowInner(p) {
@@ -432,21 +434,21 @@ async function Reader(bookId, pageArg) {
     if (p.kind === "raw") faHtml = `<span dir="ltr">${esc(p.text)}</span>`;
     else if (L.state === "live") faHtml = esc(L.text) + '<span class="caret"></span>';
     else if (L.state === "streamed") faHtml = esc(L.text);
-    else if (L.state === "queued") faHtml = `<span class="todo">در صف ترجمه…</span>`;
-    else if (L.state === "error") faHtml = `<div class="err">${esc(L.error)}</div><div class="acts" style="opacity:1"><button class="btn sm" data-a="retry">تلاش دوباره</button><a class="btn sm ghost" href="#/settings">تنظیمات</a></div>`;
+    else if (L.state === "queued") faHtml = `<span class="todo">${tr(`در صف ترجمه…`, `Queued for translation…`)}</span>`;
+    else if (L.state === "error") faHtml = `<div class="err">${esc(L.error)}</div><div class="acts" style="opacity:1"><button class="btn sm" data-a="retry">${tr("تلاش دوباره", "Retry")}</button><a class="btn sm ghost" href="#/settings">${tr("تنظیمات", "Settings")}</a></div>`;
     else if (shown) faHtml = `${hlFa(entFa(esc(shown.text)))}<div class="acts">
         ${providerPill((p.better || p.base).provider, (p.better || p.base).model)}
-        ${p.better ? `<span class="tag">نسخه‌ی بهتر</span><button class="btn sm ghost" data-a="base">نسخه‌ی اولیه</button>`
-                   : `<button class="btn sm ghost" data-a="better" title="${esc(task.better.provider + " · " + task.better.model)}">✦ بهتر</button>`}
-        <button class="btn sm ghost" data-a="deep">توضیح ۴ سطحی</button>
-        <button class="btn sm ghost" data-a="cards">کارت مفهومی</button>
-        <button class="btn sm ghost" data-a="ask">💬 استاد</button>
-        <button class="btn sm ghost" data-a="redo">دوباره</button>
-        <button class="btn sm ghost" data-a="copy">کپی</button></div>`;
-    else faHtml = `<span class="todo">برای ترجمه کلیک کن</span><div class="acts">
-        <button class="btn sm ghost" data-a="deep">توضیح ۴ سطحی</button>
-        <button class="btn sm ghost" data-a="cards">کارت مفهومی</button>
-        <button class="btn sm ghost" data-a="ask">💬 استاد</button></div>`;
+        ${p.better ? `<span class="tag">${tr("نسخه‌ی بهتر", "Better version")}</span><button class="btn sm ghost" data-a="base">${tr("نسخه‌ی اولیه", "Original version")}</button>`
+                   : `<button class="btn sm ghost" data-a="better" title="${esc(task.better.provider + " · " + task.better.model)}">${tr(`✦ بهتر`, `✦ Better`)}</button>`}
+        <button class="btn sm ghost" data-a="deep">${tr("توضیح ۴ سطحی", "4-level explain")}</button>
+        <button class="btn sm ghost" data-a="cards">${tr("کارت مفهومی", "Concept cards")}</button>
+        <button class="btn sm ghost" data-a="ask">${tr("💬 استاد", "💬 Tutor")}</button>
+        <button class="btn sm ghost" data-a="redo">${tr("دوباره", "Redo")}</button>
+        <button class="btn sm ghost" data-a="copy">${tr("کپی", "Copy")}</button></div>`;
+    else faHtml = `<span class="todo">${tr(`برای ترجمه کلیک کن`, `Click to translate`)}</span><div class="acts">
+        <button class="btn sm ghost" data-a="deep">${tr("توضیح ۴ سطحی", "4-level explain")}</button>
+        <button class="btn sm ghost" data-a="cards">${tr("کارت مفهومی", "Concept cards")}</button>
+        <button class="btn sm ghost" data-a="ask">${tr("💬 استاد", "💬 Tutor")}</button></div>`;
     return `<div class="fa">${hmHtml}${faHtml}${!L.state ? deepExpHtml(p) : ""}${shown && !L.state ? explainHtml(p) : ""}</div><div class="src" dir="ltr">${hlEn(entEn(esc(p.text)))}</div>${rxHtml(p)}`;
   }
   function rowClass(p) {
@@ -456,12 +458,12 @@ async function Reader(bookId, pageArg) {
   }
   function renderParas() {
     if (!data.paragraphs.length) {
-      canvas.innerHTML = `<div class="sheet"><div class="paper cta"><b>این صفحه متنی ندارد</b><span>احتمالاً تصویر یا صفحه‌ی خالی است.</span>
-        <img src="/api/books/${bookId}/pages/${S.page}/image" alt="تصویر صفحه" style="max-width:380px;width:100%;border:1px solid var(--line);border-radius:6px"></div></div>`;
+      canvas.innerHTML = `<div class="sheet"><div class="paper cta"><b>${tr(`این صفحه متنی ندارد`, `This page has no text`)}</b><span>${tr(`احتمالاً تصویر یا صفحه‌ی خالی است.`, `It's probably an image or a blank page.`)}</span>
+        <img src="/api/books/${bookId}/pages/${S.page}/image" alt="${tr("تصویر صفحه", "Page image")}" style="max-width:380px;width:100%;border:1px solid var(--line);border-radius:6px"></div></div>`;
       return;
     }
     canvas.innerHTML = `<div class="sheet lay-${S.layout} ${S.heatOn && S.onlyCore ? "hm-only-core" : ""}">
-      <div class="colheads"><span>فارسی</span><span>English</span></div>
+      <div class="colheads"><span>${tr("فارسی", "Persian")}</span><span>English</span></div>
       <div class="paper" id="rows">${data.paragraphs.map(p => `<div class="${rowClass(p)}" data-id="${p.id}" tabindex="0">${rowInner(p)}</div>`).join("")}</div>${chapterEndCard()}</div>`;
     $("#rows").addEventListener("click", onRowClick);
     scrollToMark(); flashRow();
@@ -509,7 +511,7 @@ async function Reader(bookId, pageArg) {
 
   async function rowAction(p, a) {
     if (a === "copy") {
-      try { await navigator.clipboard.writeText((p.better || p.base).text); toast("کپی شد"); } catch { toast("کپی نشد", true); }
+      try { await navigator.clipboard.writeText((p.better || p.base).text); toast(tr("کپی شد", "Copied")); } catch { toast(tr("کپی نشد", "Couldn't copy"), true); }
     } else if (a === "better") { enqueue(p, "better"); }
     else if (a === "deep") { runDeepExplain(p, DEXP[p.id]?.active || "eli5"); }
     else if (a === "cards") { Deep.openCardsModal(p.id, () => { refreshDue(); if (S.tab === "words") renderTab(); }); }
@@ -580,8 +582,8 @@ async function Reader(bookId, pageArg) {
     if (!alive || want !== S.page) return;
     try { data = await api(`/api/books/${bookId}/pages/${want}`); } catch {}
     render(); refreshUsage();
-    if (result?.misaligned) toast("مدل مرز پاراگراف‌ها را نگه نداشت؛ ترجمه در حالت صفحه‌ای ذخیره شد و پاراگراف‌های بی‌ترجمه را می‌توانی تک‌تک ترجمه کنی.", true);
-    else if (result?.sent) toast(`${fa(result.stored)} پاراگراف با یک درخواست ترجمه شد`);
+    if (result?.misaligned) toast(tr("مدل مرز پاراگراف‌ها را نگه نداشت؛ ترجمه در حالت صفحه‌ای ذخیره شد و پاراگراف‌های بی‌ترجمه را می‌توانی تک‌تک ترجمه کنی.", "The model didn't keep paragraph boundaries; the translation was saved in page mode and you can translate the remaining paragraphs one by one."), true);
+    else if (result?.sent) toast(tr(`${fa(result.stored)} پاراگراف با یک درخواست ترجمه شد`, `${fa(result.stored)} paragraphs translated in one request`));
   }
   async function pump() {
     if (Q.cur || !Q.list.length) return;
@@ -623,37 +625,37 @@ async function Reader(bookId, pageArg) {
     const pt = data.page_translation;
     const img = data.has_file
       ? `<div class="pane img-pane"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-          <span class="small muted">صفحه‌ی ${fa(S.page)}</span>
-          <button class="btn sm" id="img-analyze">🔍 تحلیل نمودار / فرمول</button></div>
-          <div class="img-wrap"><img src="/api/books/${bookId}/pages/${S.page}/image?zoom=1.6" alt="صفحه‌ی ${fa(S.page)} از فایل اصلی" draggable="false"></div>
+          <span class="small muted">${tr("صفحه‌ی", "Page")} ${fa(S.page)}</span>
+          <button class="btn sm" id="img-analyze">${tr(`🔍 تحلیل نمودار / فرمول`, `🔍 Analyze chart / formula`)}</button></div>
+          <div class="img-wrap"><img src="/api/books/${bookId}/pages/${S.page}/image?zoom=1.6" alt="${tr(`صفحه‌ی ${fa(S.page)} از فایل اصلی`, `Page ${fa(S.page)} of the original file`)}" draggable="false"></div>
           <div id="img-an-out" class="deep-box" style="margin-top:12px" hidden></div></div>`
-      : `<div class="pane img-pane"><p class="small muted">این سند متنی است و تصویر صفحه ندارد.</p></div>`;
+      : `<div class="pane img-pane"><p class="small muted">${tr(`این سند متنی است و تصویر صفحه ندارد.`, `This is a text document; it has no page images.`)}</p></div>`;
     let inner;
-    if (!data.paragraphs.length) inner = `<div class="cta"><b>این صفحه متنی برای ترجمه ندارد</b></div>`;
-    else if (pageCtrl) inner = `<div class="page-meta"><span class="pill busy">در حال ترجمه</span></div><div id="ptext">${paras(pageStreamText)}<span class="caret"></span></div>`;
+    if (!data.paragraphs.length) inner = `<div class="cta"><b>${tr(`این صفحه متنی برای ترجمه ندارد`, `This page has no text to translate`)}</b></div>`;
+    else if (pageCtrl) inner = `<div class="page-meta"><span class="pill busy">${tr("در حال ترجمه", "Translating")}</span></div><div id="ptext">${paras(pageStreamText)}<span class="caret"></span></div>`;
     else if (pt) inner = `<div class="page-meta"><span>${providerPill(pt.provider, pt.model)}</span>
-        <span><button class="btn sm ghost" id="pcopy">کپی</button><button class="btn sm ghost" id="predo">ترجمه‌ی دوباره</button></span></div>
+        <span><button class="btn sm ghost" id="pcopy">${tr("کپی", "Copy")}</button><button class="btn sm ghost" id="predo">${tr("ترجمه‌ی دوباره", "Translate again")}</button></span></div>
         <div id="ptext">${paras(pt.text, true)}</div>${chapterEndCard()}`;
     else {
       const todo = data.paragraphs.filter(p => !p.base && p.kind !== "raw");
       const done = data.paragraphs.filter(p => p.kind !== "raw").length - todo.length;
-      inner = `<div class="cta" id="pcta"><b>این صفحه هنوز کامل ترجمه نشده</b>
-        <span class="small">${done ? `${fa(done)} پاراگراف از قبل ترجمه شده و دوباره فرستاده نمی‌شود؛ ` : ""}${fa(todo.length)} پاراگراف (${fa(todo.reduce((n, p) => n + p.text.length, 0))} کاراکتر) با یک درخواست · ${whoFor("translate_page")}</span>
-        <button class="btn go" id="pgo">${ICON.play} ترجمه‌ی کل صفحه</button></div>`;
+      inner = `<div class="cta" id="pcta"><b>${tr(`این صفحه هنوز کامل ترجمه نشده`, `This page isn't fully translated yet`)}</b>
+        <span class="small">${done ? tr(`${fa(done)} پاراگراف از قبل ترجمه شده و دوباره فرستاده نمی‌شود؛ `, `${fa(done)} paragraphs are already translated and won't be resent; `) : ""}${tr(`${fa(todo.length)} پاراگراف (${fa(todo.reduce((n, p) => n + p.text.length, 0))} کاراکتر) با یک درخواست`, `${fa(todo.length)} paragraphs (${fa(todo.reduce((n, p) => n + p.text.length, 0))} characters) in one request`)} · ${whoFor("translate_page")}</span>
+        <button class="btn go" id="pgo">${ICON.play} ${tr(`ترجمه‌ی کل صفحه`, `Translate whole page`)}</button></div>`;
     }
     canvas.innerHTML = `<div class="split"><div class="pane fa-pane"><div class="inner">${inner}
-      ${data.paragraphs.length ? `<details class="origs"><summary>متن اصلی این صفحه (برای انتخاب کلمه)</summary>${data.paragraphs.map(p => `<p class="src" dir="ltr">${hlEn(entEn(esc(p.text)))}</p>`).join("")}</details>` : ""}
+      ${data.paragraphs.length ? `<details class="origs"><summary>${tr(`متن اصلی این صفحه (برای انتخاب کلمه)`, `Original text of this page (for selecting words)`)}</summary>${data.paragraphs.map(p => `<p class="src" dir="ltr">${hlEn(entEn(esc(p.text)))}</p>`).join("")}</details>` : ""}
       </div></div>${img}</div>`;
     if ($("#pgo")) $("#pgo").onclick = runPageStream;
     if (S.hl && $(".fa-pane mark") == null && $(".origs mark")) $(".origs").open = true;
     scrollToMark();
     if ($("#predo")) $("#predo").onclick = async e => {
       const b = e.currentTarget;
-      if (b.dataset.sure !== "1") { b.dataset.sure = "1"; b.textContent = "ترجمه‌ی همه‌ی پاراگراف‌های این صفحه پاک و دوباره فرستاده می‌شود. مطمئنی؟"; return; }
+      if (b.dataset.sure !== "1") { b.dataset.sure = "1"; b.textContent = tr("ترجمه‌ی همه‌ی پاراگراف‌های این صفحه پاک و دوباره فرستاده می‌شود. مطمئنی؟", "All paragraph translations on this page will be cleared and resent. Sure?"); return; }
       await api(`/api/books/${bookId}/pages/${S.page}/translation`, { method: "DELETE" });
       data = await api(`/api/books/${bookId}/pages/${S.page}`); runPageStream();
     };
-    if ($("#pcopy")) $("#pcopy").onclick = async () => { try { await navigator.clipboard.writeText(pt.text); toast("کپی شد"); } catch { toast("کپی نشد", true); } };
+    if ($("#pcopy")) $("#pcopy").onclick = async () => { try { await navigator.clipboard.writeText(pt.text); toast(tr("کپی شد", "Copied")); } catch { toast(tr("کپی نشد", "Couldn't copy"), true); } };
     if (data.has_file) Deep.attachRegionAnalyzer(canvas, bookId, S.page, refreshUsage);
   }
   /* --- tools panel */
@@ -669,22 +671,22 @@ async function Reader(bookId, pageArg) {
     if (S.tab === "gloss") {
       const g = await api(`/api/books/${bookId}/glossary`);
       const running = g.status === "running";
-      const kinds = [["person", "شخص"], ["place", "مکان"], ["org", "سازمان"], ["concept", "مفهوم"], ["other", "دیگر"]];
+      const kinds = [["person", tr("شخص", "Person")], ["place", tr("مکان", "Place")], ["org", tr("سازمان", "Organization")], ["concept", tr("مفهوم", "Concept")], ["other", tr("دیگر", "Other")]];
       const kindSel = (v, attr) => `<select ${attr} class="kind">${kinds.map(([k, l]) => `<option value="${k}" ${v === k ? "selected" : ""}>${l}</option>`).join("")}</select>`;
-      pane.innerHTML = `<p class="small muted">روی هر اصطلاح بزن تا صفحه‌هایی که در آن آمده را ببینی و به آن‌جا بروی.</p>
+      pane.innerHTML = `<p class="small muted">${tr(`روی هر اصطلاح بزن تا صفحه‌هایی که در آن آمده را ببینی و به آن‌جا بروی.`, `Tap a term to see the pages it appears on and jump there.`)}</p>
         <div style="display:flex;gap:8px;align-items:center;justify-content:space-between">
-          <span class="small">${running ? `<span class="pill busy">در حال ساخت</span>` : (g.status || "").startsWith("error") ? `<span style="color:var(--danger)">${esc(g.status.slice(7))}</span>` : `${fa(g.items.length)} اصطلاح`}</span>
-          <button class="btn sm" id="gbuild" ${running ? "disabled" : ""} title="${esc(task.glossary.provider + " · " + (task.glossary.model || task.translate_para.model))}">${g.items.length ? "پیدا کردن اصطلاحات بیشتر" : "ساخت خودکار واژه‌نامه"}</button></div>
-        <input type="text" id="gfilter" placeholder="جست‌وجو در واژه‌نامه…" aria-label="جست‌وجو در واژه‌نامه">
+          <span class="small">${running ? `<span class="pill busy">${tr("در حال ساخت", "Building")}</span>` : (g.status || "").startsWith("error") ? `<span style="color:var(--danger)">${esc(g.status.slice(7))}</span>` : tr(`${fa(g.items.length)} اصطلاح`, `${fa(g.items.length)} terms`)}</span>
+          <button class="btn sm" id="gbuild" ${running ? "disabled" : ""} title="${esc(task.glossary.provider + " · " + (task.glossary.model || task.translate_para.model))}">${g.items.length ? tr("پیدا کردن اصطلاحات بیشتر", "Find more terms") : tr("ساخت خودکار واژه‌نامه", "Build glossary automatically")}</button></div>
+        <input type="text" id="gfilter" placeholder="${tr("جست‌وجو در واژه‌نامه…", "Search the glossary…")}" aria-label="${tr("جست‌وجو در واژه‌نامه", "Search the glossary")}">
         <div class="gloss">${g.items.map(t => `<div class="gi" data-term="${esc(t.term)}">
-            <div class="g"><button class="termbtn en" data-find="${esc(t.term)}" title="نمایش صفحه‌هایی که «${esc(t.term)}» در آن آمده">${esc(t.term)}</button>
-            <input type="text" value="${esc(t.fa)}" data-fa="${esc(t.term)}" aria-label="ترجمه‌ی ${esc(t.term)}">
-            ${kindSel(t.kind || "other", `data-kind="${esc(t.term)}" aria-label="نوع ${esc(t.term)}"`)}
-            <button class="btn sm ghost" data-rm="${esc(t.term)}" aria-label="حذف ${esc(t.term)}">×</button></div>
+            <div class="g"><button class="termbtn en" data-find="${esc(t.term)}" title="${tr(`نمایش صفحه‌هایی که «${esc(t.term)}» در آن آمده`, `Show pages where “${esc(t.term)}” appears`)}">${esc(t.term)}</button>
+            <input type="text" value="${esc(t.fa)}" data-fa="${esc(t.term)}" aria-label="${tr(`ترجمه‌ی ${esc(t.term)}`, `Translation of ${esc(t.term)}`)}">
+            ${kindSel(t.kind || "other", `data-kind="${esc(t.term)}" aria-label="${tr("نوع", "Type of")} ${esc(t.term)}"`)}
+            <button class="btn sm ghost" data-rm="${esc(t.term)}" aria-label="${tr(`حذف ${esc(t.term)}`, `Delete ${esc(t.term)}`)}">×</button></div>
             <div class="occ" hidden></div></div>`).join("")}</div>
-        <form class="gadd" id="gadd"><input id="gterm" type="text" class="ltr" placeholder="English"><input id="gfa" type="text" placeholder="فارسی">${kindSel("person", 'id="gkind" aria-label="نوع"')}<button class="btn sm">افزودن</button></form>
-        <p class="small muted">برای جست‌وجوی هر کلمه‌ی دیگر: آن را در متن انگلیسی انتخاب کن و از پنجره‌ی معنی «همه‌ی صفحه‌ها» را بزن.</p>`;
-      const save = async (term, body) => { await api(`/api/books/${bookId}/glossary`, { method: "PUT", body: { term, ...body } }); toast("ذخیره شد"); await loadEntities(); render(); };
+        <form class="gadd" id="gadd"><input id="gterm" type="text" class="ltr" placeholder="English"><input id="gfa" type="text" dir="rtl" placeholder="${tr("فارسی", "Persian")}">${kindSel("person", `id="gkind" aria-label="${tr("نوع", "Type")}"`)}<button class="btn sm">${tr("افزودن", "Add")}</button></form>
+        <p class="small muted">${tr(`برای جست‌وجوی هر کلمه‌ی دیگر: آن را در متن انگلیسی انتخاب کن و از پنجره‌ی معنی «همه‌ی صفحه‌ها» را بزن.`, `To search for any other word, select it in the English text and press “All pages” in the definition popup.`)}</p>`;
+      const save = async (term, body) => { await api(`/api/books/${bookId}/glossary`, { method: "PUT", body: { term, ...body } }); toast(tr("ذخیره شد", "Saved")); await loadEntities(); render(); };
       $$("#tabpane input[data-fa]").forEach(i => i.onchange = () => save(i.dataset.fa, { fa: i.value }));
       $$("#tabpane select[data-kind]").forEach(sel => sel.onchange = () => {
         const fav = $(`#tabpane input[data-fa="${CSS.escape(sel.dataset.kind)}"]`).value;
@@ -695,7 +697,7 @@ async function Reader(bookId, pageArg) {
         const box = b.closest(".gi").querySelector(".occ");
         if (!box.hidden) { box.hidden = true; return; }
         const faTerm = b.closest(".gi").querySelector("input[data-fa]").value;
-        box.hidden = false; box.innerHTML = `<span class="small muted">در حال جست‌وجو…</span>`;
+        box.hidden = false; box.innerHTML = `<span class="small muted">${tr(`در حال جست‌وجو…`, `Searching…`)}</span>`;
         const r = await api(`/api/books/${bookId}/find?q=${encodeURIComponent(b.dataset.find)}`);
         showOccurrences(box, r, faTerm, true);
       });
@@ -706,7 +708,7 @@ async function Reader(bookId, pageArg) {
       $("#gadd").onsubmit = async e => {
         e.preventDefault();
         const term = $("#gterm").value.trim(), f = $("#gfa").value.trim();
-        if (!term || !f) return toast("هر دو خانه را پر کن", true);
+        if (!term || !f) return toast(tr("هر دو خانه را پر کن", "Fill in both fields"), true);
         await api(`/api/books/${bookId}/glossary`, { method: "PUT", body: { term, fa: f, kind: $("#gkind").value } }); renderTab();
       };
       $("#gbuild").onclick = async () => { await api(`/api/books/${bookId}/glossary/build`, { method: "POST" }); renderTab(); };
@@ -721,16 +723,16 @@ async function Reader(bookId, pageArg) {
     } else if (S.tab === "words") {
       const { cards } = await api("/api/cards");
       const mine = cards.filter(c => c.book_id === bookId);
-      pane.innerHTML = `<p class="small muted">کلمه‌ای را در متن انگلیسی انتخاب کن تا معنی‌اش بیاید و به کارت‌ها اضافه شود.</p>
+      pane.innerHTML = `<p class="small muted">${tr(`کلمه‌ای را در متن انگلیسی انتخاب کن تا معنی‌اش بیاید و به کارت‌ها اضافه شود.`, `Select a word in the English text to see its meaning and add it to your cards.`)}</p>
         ${mine.length ? `<div class="wordlist">${mine.map(c => `<div><span class="en">${esc(c.front)}</span><span>${esc(c.back)}</span></div>`).join("")}</div>
-        <a class="btn sm" href="#/cards">مرور کارت‌ها</a>` : `<p class="small">هنوز کلمه‌ای از این کتاب ذخیره نکرده‌ای.</p>`}`;
+        <a class="btn sm" href="#/cards">${tr(`مرور کارت‌ها`, `Review cards`)}</a>` : `<p class="small">${tr(`هنوز کلمه‌ای از این کتاب ذخیره نکرده‌ای.`, `You haven't saved any words from this book yet.`)}</p>`}`;
     } else {
       const u = await api("/api/usage");
       const pct = u.cap ? Math.min(100, u.openai_tokens / u.cap * 100) : 0;
-      pane.innerHTML = `<div class="meter"><h3>OpenAI این ماه</h3><div class="track"><i style="width:${pct}%"></i></div></div>
-        <div class="kv"><span>${fa(u.openai_tokens)} از ${u.cap ? fa(u.cap) : "∞"} توکن</span><span>${u.cost ? "$" + u.cost.toFixed(2) : ""}</span></div>
-        ${u.local_share != null ? `<div class="kv"><span>سهم Ollama از درخواست‌ها</span><span>${fa(u.local_share)}٪</span></div>` : ""}
-        <div class="wordlist">${u.rows.map(r => `<div><span>${providerPill(r.provider, r.model)}</span><span class="small muted">${fa(r.calls)} درخواست</span></div>`).join("")}</div>`;
+      pane.innerHTML = `<div class="meter"><h3>${tr(`OpenAI این ماه`, `OpenAI this month`)}</h3><div class="track"><i style="width:${pct}%"></i></div></div>
+        <div class="kv"><span>${tr(`${fa(u.openai_tokens)} از ${u.cap ? fa(u.cap) : "∞"} توکن`, `${fa(u.openai_tokens)} of ${u.cap ? fa(u.cap) : "∞"} tokens`)}</span><span>${u.cost ? "$" + u.cost.toFixed(2) : ""}</span></div>
+        ${u.local_share != null ? `<div class="kv"><span>${tr("سهم Ollama از درخواست‌ها", "Ollama share of requests")}</span><span>${fa(u.local_share)}${PCT}</span></div>` : ""}
+        <div class="wordlist">${u.rows.map(r => `<div><span>${providerPill(r.provider, r.model)}</span><span class="small muted">${tr(`${fa(r.calls)} درخواست`, `${fa(r.calls)} requests`)}</span></div>`).join("")}</div>`;
     }
   }
   function refreshUsage() { if (S.tools && S.tab === "usage") renderTab(); }
@@ -764,30 +766,30 @@ async function Reader(bookId, pageArg) {
     const i = S.hl.pages.indexOf(S.page);
     if (i !== -1) S.hl.i = i;
     el.innerHTML = `<span class="hlchip"><mark class="hl" dir="ltr">${esc(S.hl.term)}</mark>
-      <span class="small">${i === -1 ? "در این صفحه نیست" : `${fa(i + 1)} از ${fa(S.hl.pages.length)} صفحه`}</span>
-      <button class="btn icon ghost" data-h="prev" title="صفحه‌ی قبلی که آمده" aria-label="قبلی">${ICON.prev}</button>
-      <button class="btn icon ghost" data-h="next" title="صفحه‌ی بعدی که آمده" aria-label="بعدی">${ICON.next}</button>
-      <button class="btn icon ghost" data-h="x" title="پاک کردن نشانه‌گذاری" aria-label="بستن">${ICON.close}</button></span>`;
+      <span class="small">${i === -1 ? tr("در این صفحه نیست", "Not on this page") : tr(`${fa(i + 1)} از ${fa(S.hl.pages.length)} صفحه`, `${fa(i + 1)} of ${fa(S.hl.pages.length)} pages`)}</span>
+      <button class="btn icon ghost" data-h="prev" title="${tr("صفحه‌ی قبلی که آمده", "Previous occurrence")}" aria-label="${tr("قبلی", "Previous")}">${ICON.prev}</button>
+      <button class="btn icon ghost" data-h="next" title="${tr("صفحه‌ی بعدی که آمده", "Next occurrence")}" aria-label="${tr("بعدی", "Next")}">${ICON.next}</button>
+      <button class="btn icon ghost" data-h="x" title="${tr("پاک کردن نشانه‌گذاری", "Clear highlights")}" aria-label="${tr("بستن", "Close")}">${ICON.close}</button></span>`;
     $$("#hlchip [data-h]").forEach(b => b.onclick = () => {
       const h = b.dataset.h, P = S.hl.pages;
       if (h === "x") { S.hl = null; renderChip(); render(); return; }
       const next = h === "next" ? P.find(p => p > S.page) : [...P].reverse().find(p => p < S.page);
-      if (next) go(next); else toast(h === "next" ? "بعد از این صفحه جای دیگری نیامده" : "قبل از این صفحه جای دیگری نیامده");
+      if (next) go(next); else toast(h === "next" ? tr("بعد از این صفحه جای دیگری نیامده", "No later occurrences") : tr("قبل از این صفحه جای دیگری نیامده", "No earlier occurrences"));
     });
   }
   function showOccurrences(box, r, faTerm, jump) {
-    if (!r.pages.length) { box.innerHTML = `<span class="small muted">در متن پیدا نشد.</span>`; return; }
+    if (!r.pages.length) { box.innerHTML = `<span class="small muted">${tr(`در متن پیدا نشد.`, `Not found in the text.`)}</span>`; return; }
     const here = S.page;
-    box.innerHTML = `<div class="small muted">${fa(r.total)} بار در ${fa(r.pages.length)} صفحه</div>` + r.pages.map((p, i) =>
-      `<button class="occ-i ${p.page > here ? "later" : ""}" data-i="${i}"><b>ص ${fa(p.page)}</b>${p.count > 1 ? `<span class="small muted"> · ${fa(p.count)} بار</span>` : ""}${p.page > here ? `<span class="later-tag">جلوتر از جایی که هستی</span>` : ""}
+    box.innerHTML = `<div class="small muted">${tr(`${fa(r.total)} بار در ${fa(r.pages.length)} صفحه`, `${fa(r.total)} times on ${fa(r.pages.length)} pages`)}</div>` + r.pages.map((p, i) =>
+      `<button class="occ-i ${p.page > here ? "later" : ""}" data-i="${i}"><b>${tr("ص", "p.")} ${fa(p.page)}</b>${p.count > 1 ? `<span class="small muted"> · ${tr(`${fa(p.count)} بار`, `${fa(p.count)}×`)}</span>` : ""}${p.page > here ? `<span class="later-tag">${tr("جلوتر از جایی که هستی", "Ahead of where you are")}</span>` : ""}
         <span class="snip" dir="ltr">${esc(p.snippet).replace(new RegExp(`(?<![A-Za-z])(${reEsc(esc(r.term))})(?![A-Za-z])`, "gi"), "<mark>$1</mark>")}</span></button>`).join("");
     $$(".occ-i", box).forEach(b => b.onclick = () => setHighlight(r, faTerm, +b.dataset.i));
     if (jump) setHighlight(r, faTerm, 0);
   }
 
   /* --- image prompt tab */
-  const STYLE_FA = { cinematic: "سینمایی", watercolor: "آبرنگ", oil: "رنگ روغن", storybook: "کتاب کودک", persian: "مینیاتور ایرانی",
-                     ink: "طراحی با جوهر", anime: "انیمه", photo: "عکس واقعی", concept: "کانسپت آرت" };
+  const STYLE_FA = { cinematic: tr("سینمایی", "Cinematic"), watercolor: tr("آبرنگ", "Watercolor"), oil: tr("رنگ روغن", "Oil painting"), storybook: tr("کتاب کودک", "Storybook"), persian: tr("مینیاتور ایرانی", "Persian miniature"),
+                     ink: tr("طراحی با جوهر", "Ink drawing"), anime: tr("انیمه", "Anime"), photo: tr("عکس واقعی", "Photo"), concept: tr("کانسپت آرت", "Concept art") };
   let imgCtrl = null;
   async function renderImageTab(pane) {
     const pageAt = S.page;
@@ -795,15 +797,15 @@ async function Reader(bookId, pageArg) {
     if (S.tab !== "image" || pageAt !== S.page) return;
     const st = LS.get("img", { style: "cinematic", aspect: "16:9", lang: "en" });
     const who = task.image_prompt?.model ? task.image_prompt : task.translate_para;
-    pane.innerHTML = `<p class="small muted">یک پرامپت برای مدل‌های تصویرساز (Midjourney، DALL·E، Flux، Stable Diffusion) از صحنه‌ی اصلی صفحه‌ی ${fa(pageAt)} می‌نویسد. فقط پرامپت؛ تصویری ساخته نمی‌شود.</p>
-      <div class="r2"><div class="field"><label for="i-style">سبک</label><select id="i-style">${Object.entries(STYLE_FA).map(([k, l]) => `<option value="${k}" ${st.style === k ? "selected" : ""}>${l}</option>`).join("")}</select></div>
-        <div class="field"><label for="i-aspect">نسبت تصویر</label><select id="i-aspect">${["16:9", "3:2", "1:1", "4:5", "9:16"].map(a => `<option ${st.aspect === a ? "selected" : ""}>${a}</option>`).join("")}</select></div></div>
-      <div class="field"><label>زبان پرامپت</label><div class="seg" id="i-lang"><button data-v="en" class="${st.lang === "en" ? "on" : ""}">English</button><button data-v="fa" class="${st.lang === "fa" ? "on" : ""}">فارسی</button></div></div>
-      <div class="field"><label for="i-wish">چه چیزی حتماً در تصویر باشد؟ (اختیاری)</label><textarea id="i-wish" rows="2" placeholder="مثلاً: کلبه‌ی کنار دریاچه در سپیده‌دم"></textarea></div>
-      <button class="btn go" id="i-go">${ICON.image} نوشتن پرامپت برای این صفحه</button>
+    pane.innerHTML = `<p class="small muted">${tr(`یک پرامپت برای مدل‌های تصویرساز (Midjourney، DALL·E، Flux، Stable Diffusion) از صحنه‌ی اصلی صفحه‌ی ${fa(pageAt)} می‌نویسد. فقط پرامپت؛ تصویری ساخته نمی‌شود.`, `Writes a prompt for image models (Midjourney, DALL·E, Flux, Stable Diffusion) from the main scene on page ${fa(pageAt)}. Prompt only; no image is generated.`)}</p>
+      <div class="r2"><div class="field"><label for="i-style">${tr("سبک", "Style")}</label><select id="i-style">${Object.entries(STYLE_FA).map(([k, l]) => `<option value="${k}" ${st.style === k ? "selected" : ""}>${l}</option>`).join("")}</select></div>
+        <div class="field"><label for="i-aspect">${tr(`نسبت تصویر`, `Aspect ratio`)}</label><select id="i-aspect">${["16:9", "3:2", "1:1", "4:5", "9:16"].map(a => `<option ${st.aspect === a ? "selected" : ""}>${a}</option>`).join("")}</select></div></div>
+      <div class="field"><label>${tr(`زبان پرامپت`, `Prompt language`)}</label><div class="seg" id="i-lang"><button data-v="en" class="${st.lang === "en" ? "on" : ""}">English</button><button data-v="fa" class="${st.lang === "fa" ? "on" : ""}">${tr("فارسی", "Persian")}</button></div></div>
+      <div class="field"><label for="i-wish">${tr(`چه چیزی حتماً در تصویر باشد؟ (اختیاری)`, `Anything that must be in the image? (optional)`)}</label><textarea id="i-wish" rows="2" placeholder="${tr(`مثلاً: کلبه‌ی کنار دریاچه در سپیده‌دم`, `e.g. a cabin by the lake at dawn`)}"></textarea></div>
+      <button class="btn go" id="i-go">${ICON.image} ${tr(`نوشتن پرامپت برای این صفحه`, `Write a prompt for this page`)}</button>
       <span class="small muted">${providerPill(who.provider, who.model)}</span>
       <div id="i-out"></div>
-      ${items.length ? `<h3 style="margin-top:6px">پرامپت‌های قبلی این صفحه</h3>${items.map(it => promptCard(it.text, it.lang, `${STYLE_FA[it.style] || it.style} · ${it.aspect}`, it.id)).join("")}` : ""}`;
+      ${items.length ? `<h3 style="margin-top:6px">${tr(`پرامپت‌های قبلی این صفحه`, `Earlier prompts for this page`)}</h3>${items.map(it => promptCard(it.text, it.lang, `${STYLE_FA[it.style] || it.style} · ${it.aspect}`, it.id)).join("")}` : ""}`;
     const save = () => LS.set("img", { style: $("#i-style").value, aspect: $("#i-aspect").value, lang: $(".on", $("#i-lang")).dataset.v });
     $("#i-style").onchange = save; $("#i-aspect").onchange = save;
     $$("#i-lang button").forEach(b => b.onclick = () => { $$("#i-lang button").forEach(x => x.classList.toggle("on", x === b)); save(); });
@@ -815,7 +817,7 @@ async function Reader(bookId, pageArg) {
       if (imgCtrl) imgCtrl.abort();
       imgCtrl = new AbortController();
       $("#i-go").disabled = true;
-      out.innerHTML = promptCard("", o.lang, "در حال نوشتن…");
+      out.innerHTML = promptCard("", o.lang, tr("در حال نوشتن…", "Writing…"));
       const box = $(".ptext", out);
       try {
         const q = new URLSearchParams({ style: o.style, aspect: o.aspect, lang: o.lang, wish: $("#i-wish").value });
@@ -831,12 +833,12 @@ async function Reader(bookId, pageArg) {
   function promptCard(text, lang, meta, id) {
     return `<div class="promptcard"><div class="ptext" dir="${lang === "fa" ? "rtl" : "ltr"}">${esc(text)}</div>
       <div class="pfoot"><span class="small muted">${esc(meta || "")}</span><span>
-      ${text ? `<button class="btn sm" data-copy>کپی</button>` : ""}${id ? `<button class="btn sm ghost danger" data-delp="${id}" aria-label="حذف">×</button>` : ""}</span></div></div>`;
+      ${text ? `<button class="btn sm" data-copy>${tr("کپی", "Copy")}</button>` : ""}${id ? `<button class="btn sm ghost danger" data-delp="${id}" aria-label="${tr("حذف", "Delete")}">×</button>` : ""}</span></div></div>`;
   }
   function bindPromptCards(root) {
     $$("[data-copy]", root).forEach(b => b.onclick = async () => {
       const t = b.closest(".promptcard").querySelector(".ptext").textContent;
-      try { await navigator.clipboard.writeText(t); toast("پرامپت کپی شد"); } catch { toast("کپی نشد", true); }
+      try { await navigator.clipboard.writeText(t); toast(tr("پرامپت کپی شد", "Prompt copied")); } catch { toast(tr("کپی نشد", "Couldn't copy"), true); }
     });
     $$("[data-delp]", root).forEach(b => b.onclick = async () => { await api(`/api/image-prompts/${b.dataset.delp}`, { method: "DELETE" }); renderTab(); });
   }
@@ -860,8 +862,8 @@ async function Reader(bookId, pageArg) {
     Graph.stop();
   }
   const ovHead = (title, controls) => `<div class="ov-head"><h2>${title}</h2>${controls}<span class="grow"></span>
-    <button class="btn icon ghost" data-fit title="جا دادن در صفحه" aria-label="جا دادن در صفحه">${ICON.fit}</button>
-    <button class="btn icon ghost" data-close title="بستن" aria-label="بستن">${ICON.close}</button></div>`;
+    <button class="btn icon ghost" data-fit title="${tr("جا دادن در صفحه", "Fit to screen")}" aria-label="${tr("جا دادن در صفحه", "Fit to screen")}">${ICON.fit}</button>
+    <button class="btn icon ghost" data-close title="${tr("بستن", "Close")}" aria-label="${tr("بستن", "Close")}">${ICON.close}</button></div>`;
 
   /* pan & zoom for a stage element inside a viewport */
   function panZoom(viewport, stage, onChange) {
@@ -890,16 +892,16 @@ async function Reader(bookId, pageArg) {
     };
   }
 
-  const KIND = { person: ["شخص", "var(--accent)"], place: ["مکان", "var(--local)"], org: ["سازمان", "var(--cloud)"], concept: ["مفهوم", "var(--saffron)"], other: ["دیگر", "var(--muted)"] };
+  const KIND = { person: [tr("شخص", "Person"), "var(--accent)"], place: [tr("مکان", "Place"), "var(--local)"], org: [tr("سازمان", "Organization"), "var(--cloud)"], concept: [tr("مفهوم", "Concept"), "var(--saffron)"], other: [tr("دیگر", "Other"), "var(--muted)"] };
 
   const Graph = (() => {
     let g = { scope: "upto", filter: null, data: null, raf: 0, pz: null, sel: null, loadedFor: 0 };
     function stop() { cancelAnimationFrame(g.raf); g.raf = 0; }
     function open() {
-      ov.innerHTML = ovHead("گراف شخصیت‌ها", `
-        <div class="seg" id="g-filter"><button data-v="person">افراد</button><button data-v="person,place">افراد و مکان‌ها</button><button data-v="">همه</button></div>
-        <div class="seg" id="g-scope"><button data-v="upto">تا صفحه‌ی فعلی</button><button data-v="all">کل کتاب</button></div>
-        <button class="btn sm" id="g-explain">توضیح رابطه‌های اصلی با مدل</button>`) +
+      ov.innerHTML = ovHead(tr("گراف شخصیت‌ها", "Character graph"), `
+        <div class="seg" id="g-filter"><button data-v="person">${tr("افراد", "People")}</button><button data-v="person,place">${tr("افراد و مکان‌ها", "People & places")}</button><button data-v="">${tr("همه", "All")}</button></div>
+        <div class="seg" id="g-scope"><button data-v="upto">${tr("تا صفحه‌ی فعلی", "Up to this page")}</button><button data-v="all">${tr("کل کتاب", "Whole book")}</button></div>
+        <button class="btn sm" id="g-explain">${tr("توضیح رابطه‌های اصلی با مدل", "Explain main relationships with the model")}</button>`) +
         `<div class="ov-body" id="g-view"><div class="ov-stage" id="g-stage"></div><div class="ov-card" id="g-card" hidden></div><div class="ov-note" id="g-note"></div></div>`;
       $("[data-close]", ov).onclick = closeOverlay;
       $("[data-fit]", ov).onclick = fit;
@@ -922,10 +924,10 @@ async function Reader(bookId, pageArg) {
       const d = await api(`/api/books/${bookId}/graph?upto=${upto}&kinds=${encodeURIComponent(g.filter)}`);
       if (S.overlay !== "graph") return;
       g.data = d; g.loadedFor = S.page; g.sel = null; $("#g-card").hidden = true;
-      $("#g-note").innerHTML = `${!d.from_glossary ? `این گراف از اسم‌های پرتکرار متن ساخته شده. برای جدا کردن افراد از مکان‌ها، <button class="linkbtn" id="g-gl">واژه‌نامه را بساز</button>. ` : ""}
-        ${g.scope === "upto" ? `فقط تا صفحه‌ی ${fa(d.upto)}؛ چیزی از ادامه‌ی کتاب لو نمی‌رود.` : "کل کتاب؛ ممکن است اتفاق‌های بعدی لو برود."} خط‌ها یعنی دو نام در یک پاراگراف آمده‌اند؛ هرچه ضخیم‌تر، دفعات بیشتر.`;
-      if ($("#g-gl")) $("#g-gl").onclick = async () => { await api(`/api/books/${bookId}/glossary/build`, { method: "POST" }); S.tools = true; S.tab = "gloss"; applyChrome(); renderTab(); toast("ساخت واژه‌نامه شروع شد"); };
-      if (!d.nodes.length) { $("#g-stage").innerHTML = ""; $("#g-card").hidden = false; $("#g-card").innerHTML = `<b>چیزی برای نمایش نیست</b><p class="small muted">${g.filter ? "با این فیلتر نامی پیدا نشد. «همه» را امتحان کن یا نوع اصطلاحات را در واژه‌نامه مشخص کن." : "هنوز نام پرتکراری در این بخش از کتاب نیامده."}</p>`; return; }
+      $("#g-note").innerHTML = `${!d.from_glossary ? tr(`این گراف از اسم‌های پرتکرار متن ساخته شده. برای جدا کردن افراد از مکان‌ها، <button class="linkbtn" id="g-gl">واژه‌نامه را بساز</button>. `, `This graph is built from frequent names in the text. To separate people from places, <button class="linkbtn" id="g-gl">build the glossary</button>. `) : ""}
+        ${g.scope === "upto" ? tr(`فقط تا صفحه‌ی ${fa(d.upto)}؛ چیزی از ادامه‌ی کتاب لو نمی‌رود.`, `Only up to page ${fa(d.upto)}, so nothing later is spoiled.`) : tr("کل کتاب؛ ممکن است اتفاق‌های بعدی لو برود.", "Whole book; later events may be spoiled.")} ${tr("خط‌ها یعنی دو نام در یک پاراگراف آمده‌اند؛ هرچه ضخیم‌تر، دفعات بیشتر.", "A line means two names appear in the same paragraph; the thicker, the more often.")}`;
+      if ($("#g-gl")) $("#g-gl").onclick = async () => { await api(`/api/books/${bookId}/glossary/build`, { method: "POST" }); S.tools = true; S.tab = "gloss"; applyChrome(); renderTab(); toast(tr("ساخت واژه‌نامه شروع شد", "Glossary build started")); };
+      if (!d.nodes.length) { $("#g-stage").innerHTML = ""; $("#g-card").hidden = false; $("#g-card").innerHTML = `<b>${tr(`چیزی برای نمایش نیست`, `Nothing to show`)}</b><p class="small muted">${g.filter ? tr("با این فیلتر نامی پیدا نشد. «همه» را امتحان کن یا نوع اصطلاحات را در واژه‌نامه مشخص کن.", "No names match this filter. Try “All”, or set term types in the glossary.") : tr("هنوز نام پرتکراری در این بخش از کتاب نیامده.", "No frequent names in this part of the book yet.")}</p>`; return; }
       simulate();
     }
     function simulate() {
@@ -1007,23 +1009,23 @@ async function Reader(bookId, pageArg) {
       dim(new Set([i, ...links.map(({ e }) => e.s === i ? e.t : e.s)]), new Set(links.map(l => l.k)));
       const card = $("#g-card"); card.hidden = false;
       card.innerHTML = `<div class="cardhead"><div><b style="font-size:1.05rem">${nodeName(n)}</b>
-          <div class="small muted"><span class="kdot" style="background:${KIND[n.kind]?.[1]}"></span>${KIND[n.kind]?.[0] || ""} · ${fa(n.count)} بار · اولین بار ص ${fa(n.first)}</div></div>
-          <button class="btn icon ghost" data-x aria-label="بستن">${ICON.close}</button></div>
-        <div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn sm" data-first>رفتن به اولین حضور</button><button class="btn sm ghost" data-all>همه‌ی صفحه‌ها</button></div>
-        <h3>ارتباط‌ها</h3>
+          <div class="small muted"><span class="kdot" style="background:${KIND[n.kind]?.[1]}"></span>${KIND[n.kind]?.[0] || ""} · ${tr(`${fa(n.count)} بار · اولین بار ص ${fa(n.first)}`, `${fa(n.count)}× · first on p. ${fa(n.first)}`)}</div></div>
+          <button class="btn icon ghost" data-x aria-label="${tr("بستن", "Close")}">${ICON.close}</button></div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn sm" data-first>${tr(`رفتن به اولین حضور`, `Go to first appearance`)}</button><button class="btn sm ghost" data-all>${tr("همه‌ی صفحه‌ها", "All pages")}</button></div>
+        <h3>${tr("ارتباط‌ها", "Connections")}</h3>
         <div class="links">${links.slice(0, 12).map(({ e, k }) => { const o = g.nodes[e.s === i ? e.t : e.s]; return `<div class="lk">
-          <button class="linkbtn" data-n="${e.s === i ? e.t : e.s}">${esc(o.fa || o.id)}</button><span class="small muted">${fa(e.w)} پاراگراف مشترک</span>
-          ${e.label ? `<div class="lab"><b>${esc(e.label)}</b> <span class="small">${esc(e.summary || "")}</span></div>` : `<button class="btn sm ghost" data-ex="${k}">توضیح رابطه</button>`}</div>`; }).join("") || `<span class="small muted">با کسی در یک پاراگراف نیامده.</span>`}</div>`;
+          <button class="linkbtn" data-n="${e.s === i ? e.t : e.s}">${esc(o.fa || o.id)}</button><span class="small muted">${tr(`${fa(e.w)} پاراگراف مشترک`, `${fa(e.w)} shared paragraphs`)}</span>
+          ${e.label ? `<div class="lab"><b>${esc(e.label)}</b> <span class="small">${esc(e.summary || "")}</span></div>` : `<button class="btn sm ghost" data-ex="${k}">${tr("توضیح رابطه", "Explain relationship")}</button>`}</div>`; }).join("") || `<span class="small muted">${tr(`با کسی در یک پاراگراف نیامده.`, `Never appears in a paragraph with anyone else.`)}</span>`}</div>`;
       bindCard(card, n);
     }
     function selectEdge(k) {
       const e = g.edges[k], a = g.nodes[e.s], b = g.nodes[e.t]; g.sel = { type: "e", k };
       dim(new Set([e.s, e.t]), new Set([k]));
       const card = $("#g-card"); card.hidden = false;
-      card.innerHTML = `<div class="cardhead"><b>${esc(a.fa || a.id)} و ${esc(b.fa || b.id)}</b><button class="btn icon ghost" data-x aria-label="بستن">${ICON.close}</button></div>
-        <div class="small muted">${fa(e.w)} پاراگراف مشترک ${g.scope === "upto" ? `تا صفحه‌ی ${fa(S.page)}` : ""}</div>
-        ${e.label ? `<div class="lab"><b>${esc(e.label)}</b><p class="small">${esc(e.summary || "")}</p><span class="small muted">بر اساس متن تا صفحه‌ی ${fa(e.label_upto)}</span></div>` : ""}
-        <button class="btn sm ${e.label ? "ghost" : ""}" data-ex="${k}">${e.label ? "توضیح دوباره با متن تا این صفحه" : "توضیح این رابطه با مدل"}</button>`;
+      card.innerHTML = `<div class="cardhead"><b>${esc(a.fa || a.id)} ${tr("و", "&amp;")} ${esc(b.fa || b.id)}</b><button class="btn icon ghost" data-x aria-label="${tr("بستن", "Close")}">${ICON.close}</button></div>
+        <div class="small muted">${tr(`${fa(e.w)} پاراگراف مشترک`, `${fa(e.w)} shared paragraphs`)} ${g.scope === "upto" ? tr(`تا صفحه‌ی ${fa(S.page)}`, `up to page ${fa(S.page)}`) : ""}</div>
+        ${e.label ? `<div class="lab"><b>${esc(e.label)}</b><p class="small">${esc(e.summary || "")}</p><span class="small muted">${tr(`بر اساس متن تا صفحه‌ی ${fa(e.label_upto)}`, `Based on the text up to page ${fa(e.label_upto)}`)}</span></div>` : ""}
+        <button class="btn sm ${e.label ? "ghost" : ""}" data-ex="${k}">${e.label ? tr("توضیح دوباره با متن تا این صفحه", "Re-explain with text up to this page") : tr("توضیح این رابطه با مدل", "Explain this relationship with the model")}</button>`;
       bindCard(card);
     }
     function bindCard(card, n) {
@@ -1034,8 +1036,8 @@ async function Reader(bookId, pageArg) {
       }
       $$("[data-n]", card).forEach(b => b.onclick = () => selectNode(+b.dataset.n));
       $$("[data-ex]", card).forEach(b => b.onclick = async () => {
-        b.disabled = true; b.textContent = "در حال بررسی…";
-        try { await explain(+b.dataset.ex); } catch (e) { toast(e.message, true); b.disabled = false; b.textContent = "توضیح رابطه"; return; }
+        b.disabled = true; b.textContent = tr("در حال بررسی…", "Checking…");
+        try { await explain(+b.dataset.ex); } catch (e) { toast(e.message, true); b.disabled = false; b.textContent = tr("توضیح رابطه", "Explain relationship"); return; }
         g.sel?.type === "n" ? selectNode(g.sel.i) : selectEdge(+b.dataset.ex);
       });
     }
@@ -1047,15 +1049,15 @@ async function Reader(bookId, pageArg) {
     async function explainTop() {
       if (!g.edges) return;
       const todo = g.edges.map((e, k) => ({ e, k })).filter(x => !x.e.label).sort((a, b) => b.e.w - a.e.w).slice(0, 8);
-      if (!todo.length) return toast("رابطه‌های اصلی قبلاً توضیح داده شده‌اند");
+      if (!todo.length) return toast(tr("رابطه‌های اصلی قبلاً توضیح داده شده‌اند", "The main relationships are already explained"));
       const btn = $("#g-explain"); btn.disabled = true;
       let n = 0;
       for (const { k } of todo) {
         if (S.overlay !== "graph") return;
-        btn.textContent = `در حال توضیح ${fa(++n)} از ${fa(todo.length)}…`;
+        btn.textContent = tr(`در حال توضیح ${fa(++n)} از ${fa(todo.length)}…`, `Explaining ${fa(++n)} of ${fa(todo.length)}…`);
         try { await explain(k); } catch (e) { toast(e.message, true); break; }
       }
-      btn.disabled = false; btn.textContent = "توضیح رابطه‌های اصلی با مدل";
+      btn.disabled = false; btn.textContent = tr("توضیح رابطه‌های اصلی با مدل", "Explain main relationships with the model");
     }
     return { open, refresh, stop };
   })();
@@ -1064,16 +1066,16 @@ async function Reader(bookId, pageArg) {
     let m = { scope: LS.get("mmScope", "page"), info: null, collapsed: new Set(), pz: null, busy: false };
     const COLORS = ["#2159A0", "#2D7A57", "#6A4BA6", "#C0841A", "#B23A5B", "#1F8A8A", "#8A5A2B"];
     function open() {
-      ov.innerHTML = ovHead("نقشه‌ی ذهنی", `
-        <div class="seg" id="m-scope"><button data-v="page">این صفحه</button><button data-v="chapter">این فصل</button><button data-v="recent">۱۰ صفحه‌ی اخیر</button></div>
+      ov.innerHTML = ovHead(tr("نقشه‌ی ذهنی", "Mind map"), `
+        <div class="seg" id="m-scope"><button data-v="page">${tr("این صفحه", "This page")}</button><button data-v="chapter">${tr("این فصل", "This chapter")}</button><button data-v="recent">${tr("۱۰ صفحه‌ی اخیر", "Last 10 pages")}</button></div>
         <span class="small muted" id="m-info"></span>
-        <button class="btn sm" id="m-build" hidden>ساختن دوباره</button><button class="btn sm ghost" id="m-copy" hidden>کپی به‌صورت Markdown</button>`) +
+        <button class="btn sm" id="m-build" hidden>${tr("ساختن دوباره", "Rebuild")}</button><button class="btn sm ghost" id="m-copy" hidden>${tr("کپی به‌صورت Markdown", "Copy as Markdown")}</button>`) +
         `<div class="ov-body" id="m-view"><div class="ov-stage" id="m-stage"></div></div>`;
       $("[data-close]", ov).onclick = closeOverlay;
       $("[data-fit]", ov).onclick = fit;
       $$("#m-scope button").forEach(b => b.onclick = () => { m.scope = b.dataset.v; LS.set("mmScope", m.scope); load(); });
       $("#m-build").onclick = build;
-      $("#m-copy").onclick = async () => { try { await navigator.clipboard.writeText(toMd(m.info.map.tree)); toast("کپی شد؛ در Obsidian یا XMind می‌توانی بچسبانی"); } catch { toast("کپی نشد", true); } };
+      $("#m-copy").onclick = async () => { try { await navigator.clipboard.writeText(toMd(m.info.map.tree)); toast(tr("کپی شد؛ در Obsidian یا XMind می‌توانی بچسبانی", "Copied; paste it into Obsidian or XMind")); } catch { toast(tr("کپی نشد", "Couldn't copy"), true); } };
       m.pz = panZoom($("#m-view"), $("#m-stage"));
       load();
     }
@@ -1085,8 +1087,8 @@ async function Reader(bookId, pageArg) {
       catch (e) { $("#m-stage").innerHTML = ""; $("#m-info").textContent = ""; showCta(e.message); return; }
       if (S.overlay !== "mind") return;
       m.info = info; m.collapsed = new Set();
-      info.label = info.label.replace(/\d+/g, d => fa(+d));
-      $("#m-info").textContent = `${info.label}${info.start !== info.end ? ` (ص ${fa(info.start)} تا ${fa(info.end)})` : ""}`;
+      info.label = trS(info.label).replace(/\d+/g, d => fa(+d));
+      $("#m-info").textContent = `${info.label}${info.start !== info.end ? tr(` (ص ${fa(info.start)} تا ${fa(info.end)})`, ` (pp. ${fa(info.start)}–${fa(info.end)})`) : ""}`;
       $("#m-build").hidden = !info.map; $("#m-copy").hidden = !info.map;
       if (info.map) renderTree(); else showCta();
     }
@@ -1097,10 +1099,10 @@ async function Reader(bookId, pageArg) {
       const view = $("#m-view");
       $(".ov-cta", view)?.remove();
       view.insertAdjacentHTML("beforeend", `<div class="ov-cta">${err ? `<div class="error-box">${esc(err)}</div>` : `
-        <b>برای ${esc(info.label)} هنوز نقشه‌ی ذهنی ساخته نشده</b>
-        <span class="small">${fa(info.chars)} کاراکتر متن · ${providerPill(who.provider, who.model)}</span>
-        ${info.chars > (who.provider === "openai" ? 40000 : who.provider === "cli2api" ? 18000 : 3000) ? `<span class="small muted">متن طولانی است؛ اول خلاصه‌ی هر بخش گرفته می‌شود و بعد نقشه ساخته می‌شود. با Ollama ممکن است چند دقیقه طول بکشد.</span>` : ""}
-        <button class="btn go" id="m-go">${ICON.mind} ساختن نقشه‌ی ذهنی</button>`}</div>`);
+        <b>${tr(`برای ${esc(info.label)} هنوز نقشه‌ی ذهنی ساخته نشده`, `No mind map yet for ${esc(info.label)}`)}</b>
+        <span class="small">${tr(`${fa(info.chars)} کاراکتر متن`, `${fa(info.chars)} characters of text`)} · ${providerPill(who.provider, who.model)}</span>
+        ${info.chars > (who.provider === "openai" ? 40000 : who.provider === "cli2api" ? 18000 : 3000) ? `<span class="small muted">${tr(`متن طولانی است؛ اول خلاصه‌ی هر بخش گرفته می‌شود و بعد نقشه ساخته می‌شود. با Ollama ممکن است چند دقیقه طول بکشد.`, `The text is long: each section is summarized first, then the map is built. With Ollama this can take a few minutes.`)}</span>` : ""}
+        <button class="btn go" id="m-go">${ICON.mind} ${tr("ساختن نقشه‌ی ذهنی", "Build mind map")}</button>`}</div>`);
       if ($("#m-go")) $("#m-go").onclick = build;
     }
     async function build() {
@@ -1108,7 +1110,7 @@ async function Reader(bookId, pageArg) {
       m.busy = true;
       $(".ov-cta", $("#m-view"))?.remove();
       $("#m-stage").innerHTML = "";
-      $("#m-view").insertAdjacentHTML("beforeend", `<div class="ov-cta"><span class="pill busy">در حال ساختن نقشه‌ی ذهنی…</span></div>`);
+      $("#m-view").insertAdjacentHTML("beforeend", `<div class="ov-cta"><span class="pill busy">${tr(`در حال ساختن نقشه‌ی ذهنی…`, `Building mind map…`)}</span></div>`);
       const scopeAt = m.scope, pageAt = S.page;
       try {
         const r = await api(`/api/books/${bookId}/mindmap?scope=${scopeAt}&page=${pageAt}`, { method: "POST" });
@@ -1181,7 +1183,7 @@ async function Reader(bookId, pageArg) {
     const full = src.textContent;
     const sentence = (full.match(/[^.!?]*[.!?]+["”’)]*|[^.!?]+$/g) || [full]).find(s => s.includes(txt)) || full;
     lookupPopover(txt, sentence.trim(), sel.getRangeAt(0).getBoundingClientRect(), { bookId, page: S.page, after: () => { if (S.tab === "words") renderTab(); },
-      find: async w => { const r = await api(`/api/books/${bookId}/find?q=${encodeURIComponent(w)}`); if (!r.pages.length) return toast("جای دیگری پیدا نشد"); setHighlight(r, "", r.pages.findIndex(x => x.page >= S.page)); } });
+      find: async w => { const r = await api(`/api/books/${bookId}/find?q=${encodeURIComponent(w)}`); if (!r.pages.length) return toast(tr("جای دیگری پیدا نشد", "Not found anywhere else")); setHighlight(r, "", r.pages.findIndex(x => x.page >= S.page)); } });
   }, 10));
 
 
@@ -1203,27 +1205,27 @@ async function Reader(bookId, pageArg) {
   }
   const entEn = html => ENT.en ? html.replace(ENT.en, m => `<span class="ent" data-e="${ENT.byEn.get(m)}">${m}</span>`) : html;
   const entFa = html => ENT.fa ? html.replace(ENT.fa, m => `<span class="ent" data-e="${ENT.byFa.get(m)}">${m}</span>`) : html;
-  const KIND_FA = { person: "شخص", place: "مکان", org: "سازمان", concept: "مفهوم", other: "" };
+  const KIND_FA = { person: KIND.person[0], place: KIND.place[0], org: KIND.org[0], concept: KIND.concept[0], other: "" };
 
   async function whoCard(i, el) {
     const t = ENT.list[i]; if (!t) return;
     const pop = $("#popover");
     pop.className = "popover whocard"; pop.hidden = false; pop.dataset.e = i;
-    pop.innerHTML = `<div class="w"><span>${esc(t.fa || t.term)}</span><small>${esc(KIND_FA[t.kind] || "")}</small></div><span class="small muted">در حال خواندن…</span>`;
+    pop.innerHTML = `<div class="w"><span>${esc(t.fa || t.term)}</span><small>${esc(KIND_FA[t.kind] || "")}</small></div><span class="small muted">${tr(`در حال خواندن…`, `Reading…`)}</span>`;
     placePopover(pop, el.getBoundingClientRect());
     let d;
     try { d = await api(`/api/books/${bookId}/who?term=${encodeURIComponent(t.term)}&upto=${S.page}`); }
     catch (e) { pop.innerHTML = `<div class="small" style="color:var(--danger)">${esc(e.message)}</div>`; return; }
     if (pop.hidden || pop.dataset.e !== String(i)) return;
     const pat = new RegExp(`(?<![A-Za-z])(${reEsc(esc(d.term))})(?![A-Za-z])`, "gi");
-    const snip = s => `<div class="wsnip"><button class="linkbtn" data-go="${s.page}">ص ${fa(s.page)}</button> <span dir="ltr">${esc(s.text).replace(pat, "<mark>$1</mark>")}</span></div>`;
+    const snip = s => `<div class="wsnip"><button class="linkbtn" data-go="${s.page}">${tr("ص", "p.")} ${fa(s.page)}</button> <span dir="ltr">${esc(s.text).replace(pat, "<mark>$1</mark>")}</span></div>`;
     pop.innerHTML = `<div class="w"><span>${esc(d.fa || d.term)}</span><small class="en" dir="ltr">${esc(d.term)}</small></div>
-      <div class="small muted">${KIND_FA[d.kind] ? `<span class="kdot" style="background:${KIND[d.kind]?.[1]}"></span>${KIND_FA[d.kind]} · ` : ""}${d.count ? `${fa(d.count)} بار در ${fa(d.pages)} صفحه تا این‌جا` : "تا این صفحه هنوز نیامده"}</div>
-      ${d.first ? `<h4>اولین بار</h4>${snip(d.first)}` : ""}
-      ${d.last ? `<h4>آخرین بار پیش از این</h4>${snip(d.last)}` : ""}
-      ${d.links.length ? `<h4>بیشتر با این‌ها آمده</h4><div class="wlinks">${d.links.map(l => `<span class="wl" title="${esc(l.summary || "")}"><b>${esc(l.fa || l.term)}</b>${l.label ? ` <span class="small">· ${esc(l.label)}</span>` : ` <span class="small muted">${fa(l.w)}</span>`}</span>`).join("")}</div>` : ""}
-      <div class="foot"><span class="small muted">بدون درخواست به مدل</span><span style="display:flex;gap:6px">
-        <button class="btn sm ghost" data-graph>در گراف</button><button class="btn sm" data-all>همه‌ی صفحه‌ها</button></span></div>`;
+      <div class="small muted">${KIND_FA[d.kind] ? `<span class="kdot" style="background:${KIND[d.kind]?.[1]}"></span>${KIND_FA[d.kind]} · ` : ""}${d.count ? tr(`${fa(d.count)} بار در ${fa(d.pages)} صفحه تا این‌جا`, `${fa(d.count)}× on ${fa(d.pages)} pages so far`) : tr("تا این صفحه هنوز نیامده", "Not mentioned yet up to this page")}</div>
+      ${d.first ? `<h4>${tr("اولین بار", "First mention")}</h4>${snip(d.first)}` : ""}
+      ${d.last ? `<h4>${tr(`آخرین بار پیش از این`, `Most recent mention before this`)}</h4>${snip(d.last)}` : ""}
+      ${d.links.length ? `<h4>${tr(`بیشتر با این‌ها آمده`, `Most often appears with`)}</h4><div class="wlinks">${d.links.map(l => `<span class="wl" title="${esc(l.summary || "")}"><b>${esc(l.fa || l.term)}</b>${l.label ? ` <span class="small">· ${esc(l.label)}</span>` : ` <span class="small muted">${fa(l.w)}</span>`}</span>`).join("")}</div>` : ""}
+      <div class="foot"><span class="small muted">${tr(`بدون درخواست به مدل`, `No model request`)}</span><span style="display:flex;gap:6px">
+        <button class="btn sm ghost" data-graph>${tr("در گراف", "In graph")}</button><button class="btn sm" data-all>${tr("همه‌ی صفحه‌ها", "All pages")}</button></span></div>`;
     placePopover(pop, el.getBoundingClientRect());
     $$("[data-go]", pop).forEach(b => b.onclick = () => { hidePopover(); setHighlight({ term: d.term, pages: [+b.dataset.go] }, d.fa, 0); });
     $("[data-all]", pop).onclick = async () => { hidePopover(); const r = await api(`/api/books/${bookId}/find?q=${encodeURIComponent(d.term)}`); setHighlight(r, d.fa, Math.max(0, r.pages.findIndex(p => p.page >= S.page))); };
@@ -1260,9 +1262,9 @@ async function Reader(bookId, pageArg) {
   function chapterEndCard() {
     const ch = chapterOf(S.page);
     if (!ch || ch.end !== S.page) return "";
-    return `<div class="chend"><div><span class="eyebrow-s">پایان فصل</span><b dir="auto">${esc(ch.title)}</b>
-      <span class="small muted">چند سؤال کوتاه کمک می‌کند چیزهای مهم این فصل در ذهنت بماند.</span></div>
-      <span class="row-acts"><button class="btn ghost" data-post>${ICON.post} پست آموزشی</button><button class="btn go" data-quiz>${ICON.check} مرور این فصل</button></span></div>`;
+    return `<div class="chend"><div><span class="eyebrow-s">${tr(`پایان فصل`, `End of chapter`)}</span><b dir="auto">${esc(ch.title)}</b>
+      <span class="small muted">${tr(`چند سؤال کوتاه کمک می‌کند چیزهای مهم این فصل در ذهنت بماند.`, `A few short questions help the key points of this chapter stick.`)}</span></div>
+      <span class="row-acts"><button class="btn ghost" data-post>${ICON.post} ${tr("پست آموزشی", "Teaching post")}</button><button class="btn go" data-quiz>${ICON.check} ${tr("مرور این فصل", "Review this chapter")}</button></span></div>`;
   }
   canvas.addEventListener("click", e => { if (e.target.closest("[data-quiz]")) openOverlay("quiz"); if (e.target.closest("[data-post]")) openOverlay("post"); });
 
@@ -1270,32 +1272,32 @@ async function Reader(bookId, pageArg) {
   const wel = $("#welcome");
   function ago(iso) {
     const h = (Date.now() - new Date(iso)) / 36e5;
-    if (h < 24) return `${fa(Math.round(h))} ساعت پیش`;
-    const d = Math.round(h / 24); return d < 30 ? `${fa(d)} روز پیش` : `${fa(Math.round(d / 30))} ماه پیش`;
+    if (h < 24) return tr(`${fa(Math.round(h))} ساعت پیش`, `${fa(Math.round(h))} hours ago`);
+    const d = Math.round(h / 24); return d < 30 ? tr(`${fa(d)} روز پیش`, `${fa(d)} days ago`) : tr(`${fa(Math.round(d / 30))} ماه پیش`, `${fa(Math.round(d / 30))} months ago`);
   }
   async function showWelcome() {
     const r = await api(`/api/books/${bookId}/recap?page=${book.last_page}`);
     const ch = chapterOf(book.last_page);
     wel.hidden = false;
-    wel.innerHTML = `<div class="wel-head"><div><span class="eyebrow-s">خوش برگشتی</span>
-        <b>آخرین بار ${ago(book.opened)} تا صفحه‌ی ${fa(book.last_page)} خواندی${ch ? ` · <span dir="auto">${esc(ch.title)}</span>` : ""}</b></div>
-        <button class="btn icon ghost" data-x aria-label="بستن">${ICON.close}</button></div>
+    wel.innerHTML = `<div class="wel-head"><div><span class="eyebrow-s">${tr(`خوش برگشتی`, `Welcome back`)}</span>
+        <b>${tr(`آخرین بار ${ago(book.opened)} تا صفحه‌ی ${fa(book.last_page)} خواندی`, `Last time, ${ago(book.opened)}, you read up to page ${fa(book.last_page)}`)}${ch ? ` · <span dir="auto">${esc(ch.title)}</span>` : ""}</b></div>
+        <button class="btn icon ghost" data-x aria-label="${tr("بستن", "Close")}">${ICON.close}</button></div>
       <div id="wel-body">${recapBody(r)}</div>`;
     $("[data-x]", wel).onclick = () => { wel.hidden = true; };
     bindRecap(wel, r, book.last_page);
   }
   function recapBody(r) {
     const who = task.recap?.model ? task.recap : task.translate_para;
-    return r.recap ? `<h4>قبلاً در این کتاب… <span class="small muted">(ص ${fa(r.start)} تا ${fa(r.end)})</span></h4><p class="recap-text">${esc(r.recap.text)}</p>
-        <div class="row-acts"><button class="btn sm ghost" data-recap>نوشتن دوباره</button></div>`
-      : `<p class="small muted">می‌خواهی خلاصه‌ای از ${fa(r.end - r.start + 1)} صفحه‌ی آخر (ص ${fa(r.start)} تا ${fa(r.end)}، ${fa(r.chars)} کاراکتر) را ببینی؟</p>
-        <div class="row-acts"><button class="btn go" data-recap>${ICON.play} «قبلاً در این کتاب…»</button><span class="small">${providerPill(who.provider, who.model)}</span></div>`;
+    return r.recap ? `<h4>${tr("قبلاً در این کتاب…", "Previously in this book…")} <span class="small muted">(${tr(`ص ${fa(r.start)} تا ${fa(r.end)}`, `pp. ${fa(r.start)}–${fa(r.end)}`)})</span></h4><p class="recap-text">${esc(r.recap.text)}</p>
+        <div class="row-acts"><button class="btn sm ghost" data-recap>${tr("نوشتن دوباره", "Rewrite")}</button></div>`
+      : `<p class="small muted">${tr(`می‌خواهی خلاصه‌ای از ${fa(r.end - r.start + 1)} صفحه‌ی آخر (ص ${fa(r.start)} تا ${fa(r.end)}، ${fa(r.chars)} کاراکتر) را ببینی؟`, `Want a recap of the last ${fa(r.end - r.start + 1)} pages (pp. ${fa(r.start)}–${fa(r.end)}, ${fa(r.chars)} characters)?`)}</p>
+        <div class="row-acts"><button class="btn go" data-recap>${ICON.play} ${tr("«قبلاً در این کتاب…»", "“Previously in this book…”")}</button><span class="small">${providerPill(who.provider, who.model)}</span></div>`;
   }
   function bindRecap(root, r, page) {
     const b = $("[data-recap]", root); if (!b) return;
     b.onclick = async () => {
       const box = $("#wel-body", root) || root.querySelector(".recap-box");
-      box.innerHTML = `<h4>قبلاً در این کتاب…</h4><p class="recap-text"><span class="caret"></span></p>`;
+      box.innerHTML = `<h4>${tr("قبلاً در این کتاب…", "Previously in this book…")}</h4><p class="recap-text"><span class="caret"></span></p>`;
       const out = $(".recap-text", box);
       try {
         await streamPost(`/api/books/${bookId}/recap?page=${page}`, null, t => { out.innerHTML = esc(t) + '<span class="caret"></span>'; });
@@ -1314,18 +1316,18 @@ async function Reader(bookId, pageArg) {
       api("/api/usage").catch(() => null),
     ]);
     if (S.tab !== "review" || pageAt !== S.page) return;
-    q.label = q.label.replace(/\d+/g, d => fa(+d));
-    const usageHtml = u ? `<hr class="sep"><h4>مصرف این ماه</h4>
-      <div class="wordlist">${(u.rows || []).map(x => `<div><span>${providerPill(x.provider, x.model)}</span><span class="small muted">${fa(x.calls)} درخواست</span></div>`).join("") || `<p class="small muted">هنوز درخواستی ثبت نشده.</p>`}</div>` : "";
+    q.label = trS(q.label).replace(/\d+/g, d => fa(+d));
+    const usageHtml = u ? `<hr class="sep"><h4>${tr("مصرف این ماه", "Usage this month")}</h4>
+      <div class="wordlist">${(u.rows || []).map(x => `<div><span>${providerPill(x.provider, x.model)}</span><span class="small muted">${tr(`${fa(x.calls)} درخواست`, `${fa(x.calls)} requests`)}</span></div>`).join("") || `<p class="small muted">${tr(`هنوز درخواستی ثبت نشده.`, `No requests yet.`)}</p>`}</div>` : "";
     pane.innerHTML = `<div class="recap-box">${recapBody(r)}</div>
       <hr class="sep">
-      <h4>سؤال‌های مرور <span class="small muted" dir="auto">${esc(q.label)}</span></h4>
-      <p class="small muted">${q.quiz ? `${fa(q.quiz.questions.length)} سؤال آماده است.` : `از ص ${fa(q.start)} تا ${fa(q.end)} (${fa(q.chars)} کاراکتر)؛ سؤال‌ها یک بار ساخته و ذخیره می‌شوند.`}</p>
-      <button class="btn ${q.quiz ? "" : "go"}" id="rv-quiz">${ICON.check} ${q.quiz ? "باز کردن سؤال‌ها" : "ساختن سؤال‌های این فصل"}</button>
+      <h4>${tr("سؤال‌های مرور", "Review questions")} <span class="small muted" dir="auto">${esc(q.label)}</span></h4>
+      <p class="small muted">${q.quiz ? tr(`${fa(q.quiz.questions.length)} سؤال آماده است.`, `${fa(q.quiz.questions.length)} questions ready.`) : tr(`از ص ${fa(q.start)} تا ${fa(q.end)} (${fa(q.chars)} کاراکتر)؛ سؤال‌ها یک بار ساخته و ذخیره می‌شوند.`, `pp. ${fa(q.start)}–${fa(q.end)} (${fa(q.chars)} characters); questions are generated once and saved.`)}</p>
+      <button class="btn ${q.quiz ? "" : "go"}" id="rv-quiz">${ICON.check} ${q.quiz ? tr("باز کردن سؤال‌ها", "Open questions") : tr("ساختن سؤال‌های این فصل", "Generate questions for this chapter")}</button>
       <hr class="sep">
-      <h4>خواندن آفلاین روی گوشی</h4>
-      <p class="small muted">این فصل یا کل کتاب را به یک فایل HTML تبدیل کن که بدون اینترنت باز می‌شود.</p>
-      <div class="row-acts"><a class="btn sm" href="/api/books/${bookId}/export?page=${pageAt}&scope=chapter">دانلود این فصل</a><a class="btn sm ghost" href="/api/books/${bookId}/export?scope=book">کل کتاب</a></div>${usageHtml}`;
+      <h4>${tr(`خواندن آفلاین روی گوشی`, `Offline reading on your phone`)}</h4>
+      <p class="small muted">${tr(`این فصل یا کل کتاب را به یک فایل HTML تبدیل کن که بدون اینترنت باز می‌شود.`, `Export this chapter or the whole book as an HTML file that opens without internet.`)}</p>
+      <div class="row-acts"><a class="btn sm" href="/api/books/${bookId}/export?page=${pageAt}&scope=chapter">${tr(`دانلود این فصل`, `Download this chapter`)}</a><a class="btn sm ghost" href="/api/books/${bookId}/export?scope=book">${tr("کل کتاب", "Whole book")}</a></div>${usageHtml}`;
     bindRecap(pane, r, pageAt);
     $("#rv-quiz").onclick = () => openOverlay("quiz");
   }
@@ -1334,22 +1336,22 @@ async function Reader(bookId, pageArg) {
   const Quiz = (() => {
     let st = null;
     async function open() {
-      ov.innerHTML = ovHead("مرور فصل", `<span class="small muted" id="q-info"></span>`).replace(/<button class="btn icon ghost" data-fit[^>]*>.*?<\/button>/, "") +
-        `<div class="ov-scroll" id="q-body"><div class="ov-cta" style="position:static;min-height:40vh"><span class="pill busy">در حال آماده کردن…</span></div></div>`;
+      ov.innerHTML = ovHead(tr("مرور فصل", "Chapter review"), `<span class="small muted" id="q-info"></span>`).replace(/<button class="btn icon ghost" data-fit[^>]*>.*?<\/button>/, "") +
+        `<div class="ov-scroll" id="q-body"><div class="ov-cta" style="position:static;min-height:40vh"><span class="pill busy">${tr(`در حال آماده کردن…`, `Preparing…`)}</span></div></div>`;
       $("[data-close]", ov).onclick = closeOverlay;
       const pageAt = S.page;
       let info = await api(`/api/books/${bookId}/quiz?page=${pageAt}&scope=chapter`);
-      info.label = info.label.replace(/\d+/g, d => fa(+d));
-      $("#q-info").innerHTML = `<span dir="auto">${esc(info.label)}</span> · ص ${fa(info.start)} تا ${fa(info.end)}`;
+      info.label = trS(info.label).replace(/\d+/g, d => fa(+d));
+      $("#q-info").innerHTML = `<span dir="auto">${esc(info.label)}</span> · ${tr(`ص ${fa(info.start)} تا ${fa(info.end)}`, `pp. ${fa(info.start)}–${fa(info.end)}`)}`;
       if (!info.quiz) {
         const who = task.quiz?.model ? task.quiz : task.translate_para;
-        $("#q-body").innerHTML = `<div class="ov-cta" style="position:static;min-height:50vh"><b>سؤال‌های این فصل هنوز ساخته نشده</b>
-          <span class="small">${fa(info.chars)} کاراکتر متن · ${providerPill(who.provider, who.model)}</span>
-          ${info.chars > (who.provider === "openai" ? 40000 : who.provider === "cli2api" ? 18000 : 3000) ? `<span class="small muted">فصل طولانی است؛ اول هر بخش خلاصه می‌شود. با Ollama ممکن است چند دقیقه طول بکشد.</span>` : ""}
-          <button class="btn go" id="q-go">${ICON.check} ساختن سؤال‌ها</button></div>`;
+        $("#q-body").innerHTML = `<div class="ov-cta" style="position:static;min-height:50vh"><b>${tr(`سؤال‌های این فصل هنوز ساخته نشده`, `No questions for this chapter yet`)}</b>
+          <span class="small">${tr(`${fa(info.chars)} کاراکتر متن`, `${fa(info.chars)} characters of text`)} · ${providerPill(who.provider, who.model)}</span>
+          ${info.chars > (who.provider === "openai" ? 40000 : who.provider === "cli2api" ? 18000 : 3000) ? `<span class="small muted">${tr(`فصل طولانی است؛ اول هر بخش خلاصه می‌شود. با Ollama ممکن است چند دقیقه طول بکشد.`, `The chapter is long, so each section is summarized first. With Ollama this can take a few minutes.`)}</span>` : ""}
+          <button class="btn go" id="q-go">${ICON.check} ${tr("ساختن سؤال‌ها", "Generate questions")}</button></div>`;
         $("#q-go").onclick = async () => {
-          $("#q-body").innerHTML = `<div class="ov-cta" style="position:static;min-height:50vh"><span class="pill busy">در حال نوشتن سؤال‌ها…</span></div>`;
-          try { info = await api(`/api/books/${bookId}/quiz?page=${pageAt}&scope=chapter`, { method: "POST" }); info.label = info.label.replace(/\d+/g, d => fa(+d)); refreshUsage(); }
+          $("#q-body").innerHTML = `<div class="ov-cta" style="position:static;min-height:50vh"><span class="pill busy">${tr(`در حال نوشتن سؤال‌ها…`, `Writing questions…`)}</span></div>`;
+          try { info = await api(`/api/books/${bookId}/quiz?page=${pageAt}&scope=chapter`, { method: "POST" }); info.label = trS(info.label).replace(/\d+/g, d => fa(+d)); refreshUsage(); }
           catch (e) { $("#q-body").innerHTML = `<div class="error-box" style="margin:20px">${esc(e.message)}</div>`; return; }
           if (S.overlay === "quiz") show(info);
         };
@@ -1361,71 +1363,71 @@ async function Reader(bookId, pageArg) {
       st = { info, done: new Set() };
       const qz = info.quiz;
       $("#q-body").innerHTML = `<div class="quiz">
-        ${qz.summary ? `<div class="qsum"><span class="eyebrow-s">خلاصه‌ی فصل</span><p>${esc(qz.summary)}</p></div>` : ""}
+        ${qz.summary ? `<div class="qsum"><span class="eyebrow-s">${tr(`خلاصه‌ی فصل`, `Chapter summary`)}</span><p>${esc(qz.summary)}</p></div>` : ""}
         <div class="qprog" id="q-prog"></div>
         ${qz.questions.map((q, i) => `<div class="qcard" data-i="${i}">
-          <div class="qhead"><span class="qn">${fa(i + 1)}</span><span class="pill ${q.type === "reflect" ? "openai" : ""}">${q.type === "reflect" ? "فکر کن" : "یادآوری"}</span></div>
+          <div class="qhead"><span class="qn">${fa(i + 1)}</span><span class="pill ${q.type === "reflect" ? "openai" : ""}">${q.type === "reflect" ? tr("فکر کن", "Reflect") : tr("یادآوری", "Recall")}</span></div>
           <p class="qq">${esc(q.q)}</p>
-          <textarea rows="2" placeholder="${q.type === "reflect" ? "نظر خودت را بنویس…" : "اول از حافظه جواب بده…"}" aria-label="جواب سؤال ${fa(i + 1)}"></textarea>
-          <div class="qacts"><button class="btn sm" data-show>نمایش جواب</button><button class="btn sm ghost" data-check title="با مدل؛ هزینه‌ی کمی دارد">بررسی جواب من</button>
-            <button class="btn sm ghost" data-card>افزودن به کارت‌ها</button></div>
+          <textarea rows="2" placeholder="${q.type === "reflect" ? tr("نظر خودت را بنویس…", "Write your own view…") : tr("اول از حافظه جواب بده…", "Answer from memory first…")}" aria-label="${tr(`جواب سؤال ${fa(i + 1)}`, `Answer to question ${fa(i + 1)}`)}"></textarea>
+          <div class="qacts"><button class="btn sm" data-show>${tr("نمایش جواب", "Show answer")}</button><button class="btn sm ghost" data-check title="${tr("با مدل؛ هزینه‌ی کمی دارد", "Uses the model; small cost")}">${tr("بررسی جواب من", "Check my answer")}</button>
+            <button class="btn sm ghost" data-card>${tr("افزودن به کارت‌ها", "Add to cards")}</button></div>
           <div class="qfb" hidden></div>
-          <div class="qans" hidden><b>${q.type === "reflect" ? "نکته‌هایی برای فکر کردن" : "جواب"}</b><p>${esc(q.a)}</p>${q.page ? `<button class="linkbtn" data-page="${q.page}">رفتن به صفحه‌ی ${fa(q.page)}</button>` : ""}</div>
+          <div class="qans" hidden><b>${q.type === "reflect" ? tr("نکته‌هایی برای فکر کردن", "Points to consider") : tr("جواب", "Answer")}</b><p>${esc(q.a)}</p>${q.page ? `<button class="linkbtn" data-page="${q.page}">${tr(`رفتن به صفحه‌ی ${fa(q.page)}`, `Go to page ${fa(q.page)}`)}</button>` : ""}</div>
         </div>`).join("")}
-        <div class="qfoot"><span class="small muted">سؤال‌ها ذخیره شده‌اند؛ دفعه‌ی بعد بدون هزینه باز می‌شوند.</span><button class="btn sm ghost" id="q-redo">ساختن سؤال‌های تازه</button></div></div>`;
+        <div class="qfoot"><span class="small muted">${tr(`سؤال‌ها ذخیره شده‌اند؛ دفعه‌ی بعد بدون هزینه باز می‌شوند.`, `Questions are saved; next time they open at no cost.`)}</span><button class="btn sm ghost" id="q-redo">${tr(`ساختن سؤال‌های تازه`, `Generate new questions`)}</button></div></div>`;
       prog();
       $$(".qcard", ov).forEach(card => {
         const i = +card.dataset.i, q = qz.questions[i];
         $("[data-show]", card).onclick = () => { $(".qans", card).hidden = false; st.done.add(i); prog(); };
         $("[data-check]", card).onclick = async e => {
           const ans = $("textarea", card).value.trim();
-          if (!ans) return toast("اول جوابت را بنویس", true);
-          const b = e.currentTarget; b.disabled = true; b.textContent = "در حال بررسی…";
+          if (!ans) return toast(tr("اول جوابت را بنویس", "Write your answer first"), true);
+          const b = e.currentTarget; b.disabled = true; b.textContent = tr("در حال بررسی…", "Checking…");
           try {
             const f = await api(`/api/books/${bookId}/quiz/feedback`, { method: "POST", body: { start: info.start, end: info.end, idx: i, answer: ans } });
-            const V = { correct: ["درست", "ok"], partial: ["تقریباً", "mid"], wrong: ["نه دقیقاً", "no"] }[f.verdict];
+            const V = { correct: [tr("درست", "Correct"), "ok"], partial: [tr("تقریباً", "Almost"), "mid"], wrong: [tr("نه دقیقاً", "Not quite"), "no"] }[f.verdict];
             const fb = $(".qfb", card); fb.hidden = false;
             fb.innerHTML = `${q.type === "reflect" ? "" : `<span class="verdict ${V[1]}">${V[0]}</span> `}${esc(f.feedback)}`;
             $(".qans", card).hidden = false; st.done.add(i); prog(); refreshUsage();
           } catch (err) { toast(err.message, true); }
-          b.disabled = false; b.textContent = "بررسی جواب من";
+          b.disabled = false; b.textContent = tr("بررسی جواب من", "Check my answer");
         };
         $("[data-card]", card).onclick = async () => {
           const r = await api("/api/cards", { method: "POST", body: { book_id: bookId, page: q.page || info.start, front: q.q, back: q.a, context: info.label } });
-          toast(r.duplicate ? "این سؤال قبلاً کارت شده" : "به کارت‌ها اضافه شد"); refreshDue();
+          toast(r.duplicate ? tr("این سؤال قبلاً کارت شده", "This question is already a card") : tr("به کارت‌ها اضافه شد", "Added to cards")); refreshDue();
         };
         const pg = $("[data-page]", card); if (pg) pg.onclick = () => { closeOverlay(); go(+pg.dataset.page); };
       });
       $("#q-redo").onclick = async e => {
         const b = e.currentTarget;
-        if (b.dataset.sure !== "1") { b.dataset.sure = "1"; b.textContent = "دوباره به مدل فرستاده می‌شود. مطمئنی؟"; return; }
-        $("#q-body").innerHTML = `<div class="ov-cta" style="position:static;min-height:50vh"><span class="pill busy">در حال نوشتن سؤال‌ها…</span></div>`;
-        try { const n = await api(`/api/books/${bookId}/quiz?page=${info.end}&scope=chapter`, { method: "POST" }); n.label = n.label.replace(/\d+/g, d => fa(+d)); show(n); refreshUsage(); }
+        if (b.dataset.sure !== "1") { b.dataset.sure = "1"; b.textContent = tr("دوباره به مدل فرستاده می‌شود. مطمئنی؟", "This will be sent to the model again. Sure?"); return; }
+        $("#q-body").innerHTML = `<div class="ov-cta" style="position:static;min-height:50vh"><span class="pill busy">${tr(`در حال نوشتن سؤال‌ها…`, `Writing questions…`)}</span></div>`;
+        try { const n = await api(`/api/books/${bookId}/quiz?page=${info.end}&scope=chapter`, { method: "POST" }); n.label = trS(n.label).replace(/\d+/g, d => fa(+d)); show(n); refreshUsage(); }
         catch (err) { $("#q-body").innerHTML = `<div class="error-box" style="margin:20px">${esc(err.message)}</div>`; }
       };
     }
     function prog() {
       const n = st.info.quiz.questions.length, d = st.done.size;
-      $("#q-prog").innerHTML = `<div class="track"><i style="width:${d / n * 100}%"></i></div><span class="small muted">${fa(d)} از ${fa(n)} سؤال</span>`;
+      $("#q-prog").innerHTML = `<div class="track"><i style="width:${d / n * 100}%"></i></div><span class="small muted">${tr(`${fa(d)} از ${fa(n)} سؤال`, `${fa(d)} of ${fa(n)} questions`)}</span>`;
     }
     return { open, refresh() {} };
   })();
 
   /* --- emotion tags & simple explanations */
-  const TAG_FA = { wow: "شگفت‌زده‌ام کرد", unclear: "برایم مبهم بود", love: "دوستش داشتم" };
+  const TAG_FA = { wow: tr("شگفت‌زده‌ام کرد", "Surprised me"), unclear: tr("برایم مبهم بود", "Unclear to me"), love: tr("دوستش داشتم", "Loved it") };
   function rxHtml(p) {
     if (p.kind === "raw") return "";
     const on = t => (p.tags || []).includes(t) ? "on" : "";
-    return `<div class="rx" role="group" aria-label="واکنش به این پاراگراف">
+    return `<div class="rx" role="group" aria-label="${tr("واکنش به این پاراگراف", "React to this paragraph")}">
       <button class="rxb wow ${on("wow")}" data-tag="wow" title="${TAG_FA.wow}" aria-label="${TAG_FA.wow}">${ICON.wow}</button>
       <button class="rxb unclear ${on("unclear")}" data-tag="unclear" title="${TAG_FA.unclear}" aria-label="${TAG_FA.unclear}">${ICON.unclear}</button>
       <button class="rxb love ${on("love")}" data-tag="love" title="${TAG_FA.love}" aria-label="${TAG_FA.love}">${ICON.love}</button>
-      <button class="rxb pin" data-pin title="گذاشتن در قصر حافظه" aria-label="گذاشتن در قصر حافظه">${ICON.pin}</button></div>`;
+      <button class="rxb pin" data-pin title="${tr("گذاشتن در قصر حافظه", "Place in memory palace")}" aria-label="${tr("گذاشتن در قصر حافظه", "Place in memory palace")}">${ICON.pin}</button></div>`;
   }
   function explainHtml(p) {
-    if (EXPL[p.id]) return `<div class="explain"><b>به زبان ساده</b><p>${esc(EXPL[p.id])}<span class="caret"></span></p></div>`;
-    if (p.explain) return `<div class="explain"><b>به زبان ساده</b><p>${esc(p.explain)}</p><button class="btn sm ghost" data-a="explain">توضیح دوباره</button></div>`;
-    if ((p.tags || []).includes("unclear")) return `<div class="explain ask"><span class="small">این پاراگراف را مبهم علامت زدی.</span><button class="btn sm" data-a="explain">توضیح به زبان ساده</button></div>`;
+    if (EXPL[p.id]) return `<div class="explain"><b>${tr("به زبان ساده", "In plain words")}</b><p>${esc(EXPL[p.id])}<span class="caret"></span></p></div>`;
+    if (p.explain) return `<div class="explain"><b>${tr("به زبان ساده", "In plain words")}</b><p>${esc(p.explain)}</p><button class="btn sm ghost" data-a="explain">${tr("توضیح دوباره", "Explain again")}</button></div>`;
+    if ((p.tags || []).includes("unclear")) return `<div class="explain ask"><span class="small">${tr(`این پاراگراف را مبهم علامت زدی.`, `You marked this paragraph as unclear.`)}</span><button class="btn sm" data-a="explain">${tr("توضیح به زبان ساده", "Explain in plain words")}</button></div>`;
     return "";
   }
   const EXPL = {};
@@ -1433,7 +1435,7 @@ async function Reader(bookId, pageArg) {
     try {
       const r = await api(`/api/paragraphs/${p.id}/tag?tag=${tag}`, { method: "POST" });
       p.tags = r.tags; paintRow(p);
-      if (r.on && tag === "unclear") toast("علامت خورد؛ هر وقت خواستی «توضیح به زبان ساده» را بزن");
+      if (r.on && tag === "unclear") toast(tr("علامت خورد؛ هر وقت خواستی «توضیح به زبان ساده» را بزن", "Marked. Press “Explain in plain words” whenever you like"));
       if (S.tab === "notebook") renderTab();
     } catch (e) { toast(e.message, true); }
   }
@@ -1453,18 +1455,18 @@ async function Reader(bookId, pageArg) {
     const pop = $("#popover");
     pop.className = "popover pinform"; pop.hidden = false; delete pop.dataset.e;
     const shown = (p.better || p.base)?.text || "";
-    pop.innerHTML = `<div class="w"><span>گذاشتن در قصر حافظه</span></div>
-      <label class="small muted" for="pin-idea">چه چیزی را می‌خواهی به خاطر بسپاری؟ (کوتاه، با کلمه‌های خودت)</label>
+    pop.innerHTML = `<div class="w"><span>${tr("گذاشتن در قصر حافظه", "Place in memory palace")}</span></div>
+      <label class="small muted" for="pin-idea">${tr(`چه چیزی را می‌خواهی به خاطر بسپاری؟ (کوتاه، با کلمه‌های خودت)`, `What do you want to remember? (short, in your own words)`)}</label>
       <textarea id="pin-idea" rows="3">${esc(shown.slice(0, 180))}</textarea>
-      <label class="small muted" for="pin-cue">یک تصویر ذهنی عجیب یا خنده‌دار برایش (اختیاری)</label>
-      <input id="pin-cue" type="text" placeholder="مثلاً: یک جعبه سیب که روی صندلی گریه می‌کند">
-      <div class="foot"><span class="small muted">در اتاق همین فصل</span><button class="btn sm primary" id="pin-save">گذاشتن</button></div>`;
+      <label class="small muted" for="pin-cue">${tr(`یک تصویر ذهنی عجیب یا خنده‌دار برایش (اختیاری)`, `A strange or funny mental image for it (optional)`)}</label>
+      <input id="pin-cue" type="text" placeholder="${tr(`مثلاً: یک جعبه سیب که روی صندلی گریه می‌کند`, `e.g. a crate of apples crying on a chair`)}">
+      <div class="foot"><span class="small muted">${tr(`در اتاق همین فصل`, `In this chapter's room`)}</span><button class="btn sm primary" id="pin-save">${tr("گذاشتن", "Place")}</button></div>`;
     placePopover(pop, anchor.getBoundingClientRect());
     $("#pin-idea").focus();
     $("#pin-save").onclick = async () => {
       try {
         const r = await api(`/api/books/${bookId}/palace`, { method: "POST", body: { page: S.page, idea: $("#pin-idea").value, cue: $("#pin-cue").value } });
-        hidePopover(); toast(`در «${r.room}»، ${r.spot} گذاشته شد`);
+        hidePopover(); toast(tr(`در «${r.room}»، ${r.spot} گذاشته شد`, `Placed in the ${trS(r.room)}, ${trS(r.spot)}`));
       } catch (e) { toast(e.message, true); }
     };
   }
@@ -1498,17 +1500,17 @@ async function Reader(bookId, pageArg) {
     if (S.tab !== "notebook") return;
     const groups = { love: [], wow: [], unclear: [] };
     t.items.forEach(x => groups[x.tag]?.push(x));
-    pane.innerHTML = `<h4>امروز چی فهمیدم؟</h4>
-      <textarea id="nb-text" rows="2" placeholder="یک جمله با کلمه‌های خودت…"></textarea>
-      <button class="btn sm primary" id="nb-save">ثبت در دفترچه</button>
+    pane.innerHTML = `<h4>${tr(`امروز چی فهمیدم؟`, `What did I learn today?`)}</h4>
+      <textarea id="nb-text" rows="2" placeholder="${tr(`یک جمله با کلمه‌های خودت…`, `One sentence in your own words…`)}"></textarea>
+      <button class="btn sm primary" id="nb-save">${tr("ثبت در دفترچه", "Save to journal")}</button>
       ${j.items.length ? `<div class="journal">${j.items.map(x => `<div class="jitem"><p>${esc(x.text)}</p>
-        <span class="small muted">${new Date(x.created).toLocaleDateString("fa-IR", { day: "numeric", month: "long" })} · ص ${fa(x.page_from)}${x.page_to > x.page_from ? `–${fa(x.page_to)}` : ""}</span></div>`).join("")}</div>` : ""}
+        <span class="small muted">${new Date(x.created).toLocaleDateString(LOCALE, { day: "numeric", month: "long" })} · ${tr("ص", "p.")} ${fa(x.page_from)}${x.page_to > x.page_from ? `–${fa(x.page_to)}` : ""}</span></div>`).join("")}</div>` : ""}
       <hr class="sep">
       ${Object.entries(groups).map(([k, arr]) => `<h4><span class="tagdot ${k}"></span>${TAG_FA[k]} <span class="small muted">${fa(arr.length)}</span></h4>
-        ${arr.length ? arr.slice(0, 30).map(x => `<button class="tagged" data-go="${x.page}" data-pid="${x.para_id}"><b>ص ${fa(x.page)}</b> <span>${esc((x.fa || x.text).slice(0, 110))}…</span>
-          ${k === "unclear" ? `<span class="small ${x.explain ? "ok" : "muted"}">${x.explain ? "توضیح داده شده" : "هنوز توضیح داده نشده"}</span>` : ""}</button>`).join("") : `<p class="small muted">هنوز چیزی علامت نزده‌ای. روی پاراگراف‌ها دکمه‌های کوچک کنارشان را بزن.</p>`}`).join("")}`;
+        ${arr.length ? arr.slice(0, 30).map(x => `<button class="tagged" data-go="${x.page}" data-pid="${x.para_id}"><b>${tr("ص", "p.")} ${fa(x.page)}</b> <span>${esc((x.fa || x.text).slice(0, 110))}…</span>
+          ${k === "unclear" ? `<span class="small ${x.explain ? "ok" : "muted"}">${x.explain ? tr("توضیح داده شده", "Explained") : tr("هنوز توضیح داده نشده", "Not explained yet")}</span>` : ""}</button>`).join("") : `<p class="small muted">${tr(`هنوز چیزی علامت نزده‌ای. روی پاراگراف‌ها دکمه‌های کوچک کنارشان را بزن.`, `Nothing tagged yet. Use the small buttons next to paragraphs.`)}</p>`}`).join("")}`;
     $("#nb-save").onclick = async () => {
-      try { await api("/api/journal", { method: "POST", body: { book_id: bookId, text: $("#nb-text").value, page_from: sess.from, page_to: Math.max(sess.to, S.page), minutes: Math.round(sess.active / 60) } }); sess.wrote = true; toast("در دفترچه ثبت شد"); renderTab(); }
+      try { await api("/api/journal", { method: "POST", body: { book_id: bookId, text: $("#nb-text").value, page_from: sess.from, page_to: Math.max(sess.to, S.page), minutes: Math.round(sess.active / 60) } }); sess.wrote = true; toast(tr("در دفترچه ثبت شد", "Saved to journal")); renderTab(); }
       catch (e) { toast(e.message, true); }
     };
     $$(".tagged", pane).forEach(b => b.onclick = () => { FLASH = +b.dataset.pid; go(+b.dataset.go); if (+b.dataset.go === S.page) flashRow(); });
@@ -1524,8 +1526,8 @@ async function Reader(bookId, pageArg) {
   const Palace = (() => {
     let pd = null;
     async function open() {
-      ov.innerHTML = ovHead("قصر حافظه", `<button class="btn sm go" id="pl-walk">${ICON.walk} قدم زدن در قصر</button>
-        <span class="small muted">هر فصل یک اتاق است. هر چیز مهم را جایی در اتاقش بگذار؛ موقع مرور در خانه قدم می‌زنی و برش می‌داری.</span>`).replace(/<button class="btn icon ghost" data-fit[^>]*>.*?<\/button>/, "") +
+      ov.innerHTML = ovHead(tr("قصر حافظه", "Memory palace"), `<button class="btn sm go" id="pl-walk">${ICON.walk} ${tr("قدم زدن در قصر", "Walk the palace")}</button>
+        <span class="small muted">${tr(`هر فصل یک اتاق است. هر چیز مهم را جایی در اتاقش بگذار؛ موقع مرور در خانه قدم می‌زنی و برش می‌داری.`, `Each chapter is a room. Place each important idea somewhere in its room; when reviewing, you walk through the house and pick them up.`)}</span>`).replace(/<button class="btn icon ghost" data-fit[^>]*>.*?<\/button>/, "") +
         `<div class="ov-scroll" id="pl-body"></div>`;
       $("[data-close]", ov).onclick = closeOverlay;
       $("#pl-walk").onclick = walk;
@@ -1536,19 +1538,19 @@ async function Reader(bookId, pageArg) {
       if (S.overlay !== "palace") return;
       const cur = pd.rooms.find(r => r.start <= S.page && S.page <= r.end);
       $("#pl-body").innerHTML = `<div class="house">${pd.rooms.map((r, i) => `<section class="room ${r.open ? "" : "locked"} ${r === cur ? "here" : ""}">
-        <header><span class="rname">${esc(r.room)}</span><b dir="auto">${esc(r.title)}</b><span class="small muted">ص ${fa(r.start)}–${fa(r.end)}</span></header>
+        <header><span class="rname">${esc(trS(r.room))}</span><b dir="auto">${esc(trS(r.title))}</b><span class="small muted">${tr("ص", "pp.")} ${fa(r.start)}–${fa(r.end)}</span></header>
         ${r.open ? `<ol class="spots">${pd.spots.slice(0, Math.max(5, r.items.length ? Math.max(...r.items.map(x => x.spot)) + 1 : 5)).map((sp, si) => {
           const it = r.items.find(x => x.spot === si);
-          return `<li class="${it ? "full" : ""}"><span class="sp">${esc(sp)}</span>${it ? `<div class="it"><p class="cue">${esc(it.cue || "—")}</p><p class="idea">${esc(it.idea)}</p>
-            <span class="itm">${it.recalled + it.missed ? `${fa(it.recalled)} از ${fa(it.recalled + it.missed)} بار یادت آمد · ` : ""}<button class="linkbtn" data-go="${it.page}">ص ${fa(it.page)}</button> <button class="linkbtn danger" data-del="${it.id}">برداشتن</button></span></div>` : `<span class="empty-spot">خالی</span>`}</li>`;
+          return `<li class="${it ? "full" : ""}"><span class="sp">${esc(trS(sp))}</span>${it ? `<div class="it"><p class="cue">${esc(it.cue || "—")}</p><p class="idea">${esc(it.idea)}</p>
+            <span class="itm">${it.recalled + it.missed ? tr(`${fa(it.recalled)} از ${fa(it.recalled + it.missed)} بار یادت آمد · `, `recalled ${fa(it.recalled)} of ${fa(it.recalled + it.missed)} times · `) : ""}<button class="linkbtn" data-go="${it.page}">${tr("ص", "p.")} ${fa(it.page)}</button> <button class="linkbtn danger" data-del="${it.id}">${tr("برداشتن", "Remove")}</button></span></div>` : `<span class="empty-spot">${tr("خالی", "Empty")}</span>`}</li>`;
         }).join("")}</ol>
-        <div class="room-acts"><button class="btn sm" data-fill="${r.end >= S.page && r.start <= S.page ? S.page : r.end}" ${r.items.length >= 5 ? "disabled" : ""}>پر کردن جاهای خالی با مدل</button></div>`
-          : `<p class="small muted">هنوز به این فصل نرسیده‌ای؛ درش بسته است.</p>`}</section>`).join("")}</div>`;
+        <div class="room-acts"><button class="btn sm" data-fill="${r.end >= S.page && r.start <= S.page ? S.page : r.end}" ${r.items.length >= 5 ? "disabled" : ""}>${tr(`پر کردن جاهای خالی با مدل`, `Fill empty spots with the model`)}</button></div>`
+          : `<p class="small muted">${tr(`هنوز به این فصل نرسیده‌ای؛ درش بسته است.`, `You haven't reached this chapter yet; its door is closed.`)}</p>`}</section>`).join("")}</div>`;
       $$("[data-del]", ov).forEach(b => b.onclick = async () => { await api(`/api/palace/${b.dataset.del}`, { method: "DELETE" }); load(); });
       $$("[data-go]", ov).forEach(b => b.onclick = () => { closeOverlay(); go(+b.dataset.go); });
       $$("[data-fill]", ov).forEach(b => b.onclick = async () => {
-        b.disabled = true; b.textContent = "مدل دارد صحنه‌ها را می‌چیند…";
-        try { const r = await api(`/api/books/${bookId}/palace/fill?page=${b.dataset.fill}`, { method: "POST" }); toast(`${fa(r.added)} چیز در «${r.room}» گذاشته شد`); refreshUsage(); }
+        b.disabled = true; b.textContent = tr("مدل دارد صحنه‌ها را می‌چیند…", "The model is setting the scenes…");
+        try { const r = await api(`/api/books/${bookId}/palace/fill?page=${b.dataset.fill}`, { method: "POST" }); toast(tr(`${fa(r.added)} چیز در «${r.room}» گذاشته شد`, `${fa(r.added)} items placed in the ${trS(r.room)}`)); refreshUsage(); }
         catch (e) { toast(e.message, true); }
         load();
       });
@@ -1556,21 +1558,21 @@ async function Reader(bookId, pageArg) {
     }
     function walk() {
       const items = pd.rooms.filter(r => r.open).flatMap(r => r.items.map(it => ({ ...it, room: r.room, title: r.title })));
-      if (!items.length) return toast("قصر هنوز خالی است. اول چیزی در اتاق‌ها بگذار.", true);
+      if (!items.length) return toast(tr("قصر هنوز خالی است. اول چیزی در اتاق‌ها بگذار.", "The palace is still empty. Place something in the rooms first."), true);
       let i = 0, shown = false, ok = 0;
       const body = $("#pl-body");
       const step = () => {
         if (i >= items.length) {
-          body.innerHTML = `<div class="walk"><div class="wcard"><span class="eyebrow-s">پایان قدم زدن</span><b class="big">${fa(ok)} از ${fa(items.length)}</b><p class="muted">چیزهایی که یادت نیامد، دفعه‌ی بعد زودتر سراغت می‌آیند. هرچه تصویرها عجیب‌تر باشند، بهتر می‌مانند.</p>
-            <button class="btn" id="w-back">برگشت به نقشه‌ی خانه</button></div></div>`;
+          body.innerHTML = `<div class="walk"><div class="wcard"><span class="eyebrow-s">${tr(`پایان قدم زدن`, `Walk complete`)}</span><b class="big">${fa(ok)} ${tr("از", "of")} ${fa(items.length)}</b><p class="muted">${tr(`چیزهایی که یادت نیامد، دفعه‌ی بعد زودتر سراغت می‌آیند. هرچه تصویرها عجیب‌تر باشند، بهتر می‌مانند.`, `What you didn't recall will come up sooner next time. The stranger the images, the better they stick.`)}</p>
+            <button class="btn" id="w-back">${tr(`برگشت به نقشه‌ی خانه`, `Back to the house map`)}</button></div></div>`;
           $("#w-back").onclick = load; return;
         }
         const it = items[i];
         body.innerHTML = `<div class="walk"><div class="wprog">${items.map((_, k) => `<i class="${k < i ? "done" : k === i ? "cur" : ""}"></i>`).join("")}</div>
-          <div class="wcard"><span class="eyebrow-s">${esc(it.room)} · ${esc(SPOTS_FA[it.spot] || "")}</span>
-          <p class="wq">${it.cue ? esc(it.cue) : "این‌جا چه گذاشته بودی؟"}</p>
-          ${shown ? `<p class="wa">${esc(it.idea)}</p><div class="wbtns"><button class="btn" data-r="0">یادم نیامد</button><button class="btn go" data-r="1">یادم آمد</button></div>`
-            : `<button class="btn primary" id="w-show">چه چیزی این‌جا بود؟ <span class="small">(فاصله)</span></button>`}</div></div>`;
+          <div class="wcard"><span class="eyebrow-s">${esc(trS(it.room))} · ${esc(trS(SPOTS_FA[it.spot] || ""))}</span>
+          <p class="wq">${it.cue ? esc(it.cue) : tr("این‌جا چه گذاشته بودی؟", "What did you leave here?")}</p>
+          ${shown ? `<p class="wa">${esc(it.idea)}</p><div class="wbtns"><button class="btn" data-r="0">${tr("یادم نیامد", "Didn't recall")}</button><button class="btn go" data-r="1">${tr("یادم آمد", "Recalled")}</button></div>`
+            : `<button class="btn primary" id="w-show">${tr("چه چیزی این‌جا بود؟", "What was here?")} <span class="small">(${tr("فاصله", "Space")})</span></button>`}</div></div>`;
         if (!shown) $("#w-show").onclick = () => { shown = true; step(); };
         $$("[data-r]", body).forEach(b => b.onclick = async () => {
           const good = b.dataset.r === "1"; if (good) ok++;
@@ -1590,54 +1592,54 @@ async function Reader(bookId, pageArg) {
   const Post = (() => {
     let info = null, saveT = null;
     async function open() {
-      ov.innerHTML = ovHead("پست آموزشی از این فصل", `<span class="small muted" id="po-info"></span>`).replace(/<button class="btn icon ghost" data-fit[^>]*>.*?<\/button>/, "") +
+      ov.innerHTML = ovHead(tr("پست آموزشی از این فصل", "Teaching post from this chapter"), `<span class="small muted" id="po-info"></span>`).replace(/<button class="btn icon ghost" data-fit[^>]*>.*?<\/button>/, "") +
         `<div class="ov-scroll"><div class="postwrap" id="po-body"></div></div>`;
       $("[data-close]", ov).onclick = closeOverlay;
       info = await api(`/api/books/${bookId}/post?page=${S.page}`);
-      info.label = info.label.replace(/\d+/g, d => fa(+d));
-      $("#po-info").innerHTML = `<span dir="auto">${esc(info.label)}</span> · ص ${fa(info.start)} تا ${fa(info.end)}`;
+      info.label = trS(info.label).replace(/\d+/g, d => fa(+d));
+      $("#po-info").innerHTML = `<span dir="auto">${esc(info.label)}</span> · ${tr(`ص ${fa(info.start)} تا ${fa(info.end)}`, `pp. ${fa(info.start)}–${fa(info.end)}`)}`;
       render();
     }
     function outlineHtml(o) {
       const who = task.post?.model ? task.post : task.translate_para;
-      if (!o) return `<div class="ov-cta" style="position:static;min-height:30vh"><b>اسکلت پست</b><span class="small">مدل فقط ساختار و ایده می‌دهد؛ نوشتن با خودت است.</span>
-        <button class="btn go" id="po-outline">${ICON.mind} ساختن اسکلت</button><span class="small">${providerPill(who.provider, who.model)}</span></div>`;
-      return `<div class="outline"><h4>شروع‌های پیشنهادی</h4><ul>${(o.hooks || []).map(h => `<li>${esc(h)}</li>`).join("")}</ul>
-        <h4>سه نکته‌ی اصلی</h4><ol>${(o.points || []).map(p => `<li><b>${esc(p.title)}</b><span class="small muted"> — ${esc(p.why || "")}</span></li>`).join("")}</ol>
-        ${o.example ? `<h4>مثال یا نقل‌قول</h4><p>${esc(o.example)}</p>` : ""}
-        ${o.question ? `<h4>سؤال پایانی برای مخاطب</h4><p>${esc(o.question)}</p>` : ""}
-        ${(o.tips || []).length ? `<h4>نکته‌ی نوشتن</h4><ul class="small">${o.tips.map(t => `<li>${esc(t)}</li>`).join("")}</ul>` : ""}
-        <button class="btn sm ghost" id="po-outline">اسکلت تازه</button></div>`;
+      if (!o) return `<div class="ov-cta" style="position:static;min-height:30vh"><b>${tr("اسکلت پست", "Post outline")}</b><span class="small">${tr("مدل فقط ساختار و ایده می‌دهد؛ نوشتن با خودت است.", "The model only suggests structure and ideas; the writing is yours.")}</span>
+        <button class="btn go" id="po-outline">${ICON.mind} ${tr("ساختن اسکلت", "Build outline")}</button><span class="small">${providerPill(who.provider, who.model)}</span></div>`;
+      return `<div class="outline"><h4>${tr(`شروع‌های پیشنهادی`, `Suggested openings`)}</h4><ul>${(o.hooks || []).map(h => `<li>${esc(h)}</li>`).join("")}</ul>
+        <h4>${tr(`سه نکته‌ی اصلی`, `Three main points`)}</h4><ol>${(o.points || []).map(p => `<li><b>${esc(p.title)}</b><span class="small muted"> — ${esc(p.why || "")}</span></li>`).join("")}</ol>
+        ${o.example ? `<h4>${tr(`مثال یا نقل‌قول`, `Example or quote`)}</h4><p>${esc(o.example)}</p>` : ""}
+        ${o.question ? `<h4>${tr(`سؤال پایانی برای مخاطب`, `Closing question for readers`)}</h4><p>${esc(o.question)}</p>` : ""}
+        ${(o.tips || []).length ? `<h4>${tr(`نکته‌ی نوشتن`, `Writing tips`)}</h4><ul class="small">${o.tips.map(t => `<li>${esc(t)}</li>`).join("")}</ul>` : ""}
+        <button class="btn sm ghost" id="po-outline">${tr("اسکلت تازه", "New outline")}</button></div>`;
     }
     function render() {
       const p = info.post || {};
       $("#po-body").innerHTML = `<aside class="po-side">${outlineHtml(p.outline)}</aside>
-        <section class="po-main"><label class="small muted" for="po-text">نوشته‌ی تو (برای تلگرام؛ کوتاه‌تر از ۱۵۰۰ کاراکتر بهتر خوانده می‌شود)</label>
-        <textarea id="po-text" rows="14" placeholder="با یکی از شروع‌ها یا جمله‌ی خودت شروع کن…">${esc(p.text || "")}</textarea>
+        <section class="po-main"><label class="small muted" for="po-text">${tr(`نوشته‌ی تو (برای تلگرام؛ کوتاه‌تر از ۱۵۰۰ کاراکتر بهتر خوانده می‌شود)`, `Your post (for Telegram; under 1,500 characters reads best)`)}</label>
+        <textarea id="po-text" rows="14" placeholder="${tr(`با یکی از شروع‌ها یا جمله‌ی خودت شروع کن…`, `Start with one of the openings or your own sentence…`)}">${esc(p.text || "")}</textarea>
         <div class="po-bar"><span class="small muted" id="po-count"></span><span style="display:flex;gap:6px">
-          <button class="btn sm ghost" id="po-copy">کپی</button><button class="btn sm" id="po-fb">بازخورد روی نوشته‌ی من</button></span></div>
+          <button class="btn sm ghost" id="po-copy">${tr("کپی", "Copy")}</button><button class="btn sm" id="po-fb">${tr("بازخورد روی نوشته‌ی من", "Feedback on my writing")}</button></span></div>
         <div id="po-fbox"></div></section>`;
       const ta = $("#po-text");
-      const count = () => { const n = ta.value.length; $("#po-count").textContent = `${fa(n)} کاراکتر${n > 4096 ? " · بیشتر از حد یک پیام تلگرام" : n > 1500 ? " · کمی بلند است" : ""}`; };
+      const count = () => { const n = ta.value.length; $("#po-count").textContent = tr(`${fa(n)} کاراکتر`, `${fa(n)} characters`) + (n > 4096 ? tr(" · بیشتر از حد یک پیام تلگرام", " · over Telegram's message limit") : n > 1500 ? tr(" · کمی بلند است", " · a bit long") : ""); };
       count();
       ta.oninput = () => { count(); clearTimeout(saveT); saveT = setTimeout(() => api(`/api/books/${bookId}/post?page=${info.start}`, { method: "PUT", body: { text: ta.value } }).catch(() => {}), 700); };
-      $("#po-copy").onclick = async () => { try { await navigator.clipboard.writeText(ta.value); toast("کپی شد؛ در تلگرام بچسبان"); } catch { toast("کپی نشد", true); } };
+      $("#po-copy").onclick = async () => { try { await navigator.clipboard.writeText(ta.value); toast(tr("کپی شد؛ در تلگرام بچسبان", "Copied; paste it into Telegram")); } catch { toast(tr("کپی نشد", "Couldn't copy"), true); } };
       $("#po-fb").onclick = async e => {
-        const b = e.currentTarget; b.disabled = true; b.textContent = "در حال خواندن نوشته‌ات…";
+        const b = e.currentTarget; b.disabled = true; b.textContent = tr("در حال خواندن نوشته‌ات…", "Reading your post…");
         try {
           const f = await api(`/api/books/${bookId}/post/feedback?page=${info.start}`, { method: "POST", body: { text: ta.value } });
-          $("#po-fbox").innerHTML = `<div class="fbbox">${f.good.length ? `<h4>چه چیزی خوب است</h4><ul>${f.good.map(x => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}
-            ${f.improve.length ? `<h4>پیشنهاد</h4><ul>${f.improve.map(x => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}
-            ${f.accuracy ? `<h4>دقت</h4><p>${esc(f.accuracy)}</p>` : ""}</div>`;
+          $("#po-fbox").innerHTML = `<div class="fbbox">${f.good.length ? `<h4>${tr(`چه چیزی خوب است`, `What works`)}</h4><ul>${f.good.map(x => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}
+            ${f.improve.length ? `<h4>${tr("پیشنهاد", "Suggestions")}</h4><ul>${f.improve.map(x => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}
+            ${f.accuracy ? `<h4>${tr("دقت", "Accuracy")}</h4><p>${esc(f.accuracy)}</p>` : ""}</div>`;
           refreshUsage();
         } catch (err) { toast(err.message, true); }
-        b.disabled = false; b.textContent = "بازخورد روی نوشته‌ی من";
+        b.disabled = false; b.textContent = tr("بازخورد روی نوشته‌ی من", "Feedback on my writing");
       };
       const ob = $("#po-outline");
       if (ob) ob.onclick = async () => {
-        ob.disabled = true; ob.textContent = "در حال ساختن…";
+        ob.disabled = true; ob.textContent = tr("در حال ساختن…", "Building…");
         try { const r = await api(`/api/books/${bookId}/post/outline?page=${info.start}`, { method: "POST" }); info.post = { ...(info.post || {}), outline: r.outline, text: ta.value }; render(); refreshUsage(); }
-        catch (err) { toast(err.message, true); ob.disabled = false; ob.textContent = "ساختن اسکلت"; }
+        catch (err) { toast(err.message, true); ob.disabled = false; ob.textContent = tr("ساختن اسکلت", "Build outline"); }
       };
     }
     return { open, refresh() {} };
@@ -1667,7 +1669,7 @@ function placePopover(pop, rect) {
 async function lookupPopover(word, sentence, rect, ctx) {
   const pop = $("#popover");
   pop.className = "popover"; delete pop.dataset.e;
-  pop.innerHTML = `<div class="w"><span>${esc(word)}</span><small>در حال جست‌وجو…</small></div>`;
+  pop.innerHTML = `<div class="w"><span>${esc(word)}</span><small>${tr(`در حال جست‌وجو…`, `Searching…`)}</small></div>`;
   pop.hidden = false;
   const place = () => placePopover(pop, rect);
   place();
@@ -1680,12 +1682,12 @@ async function lookupPopover(word, sentence, rect, ctx) {
       <div class="mean">${esc(d.meaning_fa || "")}</div>
       ${others.length ? `<ul>${others.slice(0, 4).map(o => `<li>${esc(o)}</li>`).join("")}</ul>` : ""}
       ${d.note_fa ? `<div class="small">${esc(d.note_fa)}</div>` : ""}
-      <div class="foot"><span class="small muted">${esc(d._model || "")}</span><span style="display:flex;gap:6px">${ctx.find ? `<button class="btn sm ghost" id="findall">همه‌ی صفحه‌ها</button>` : ""}<button class="btn sm primary" id="addcard">افزودن به کارت‌ها</button></span></div>`;
+      <div class="foot"><span class="small muted">${esc(d._model || "")}</span><span style="display:flex;gap:6px">${ctx.find ? `<button class="btn sm ghost" id="findall">${tr("همه‌ی صفحه‌ها", "All pages")}</button>` : ""}<button class="btn sm primary" id="addcard">${tr("افزودن به کارت‌ها", "Add to cards")}</button></span></div>`;
     if ($("#findall")) $("#findall").onclick = () => { hidePopover(); ctx.find(word); };
     place();
     $("#addcard").onclick = async () => {
       const r = await api("/api/cards", { method: "POST", body: { book_id: ctx.bookId, page: ctx.page, front: word, back, context: sentence } });
-      toast(r.duplicate ? "این کلمه قبلاً کارت شده" : "به کارت‌ها اضافه شد"); hidePopover(); refreshDue(); ctx.after && ctx.after();
+      toast(r.duplicate ? tr("این کلمه قبلاً کارت شده", "This word is already a card") : tr("به کارت‌ها اضافه شد", "Added to cards")); hidePopover(); refreshDue(); ctx.after && ctx.after();
     };
   } catch (e) {
     pop.innerHTML = `<div class="w"><span>${esc(word)}</span></div><div class="small" style="color:var(--danger)">${esc(e.message)}</div>`;
@@ -1697,36 +1699,36 @@ async function lookupPopover(word, sentence, rect, ctx) {
 async function Cards() {
   const [{ cards: due, stats }, { cards: all }] = await Promise.all([api("/api/cards/due"), api("/api/cards")]);
   view.innerHTML = `<div class="pagewrap-main">
-    <div class="head"><div><h1>مرور کارت‌ها</h1>
-      <p>${fa(stats.due)} کارت برای امروز · ${fa(stats.total)} کارت در کل · زمان‌بندی با FSRS</p></div>
-      ${all.length ? `<a class="btn" href="/api/cards/export.tsv">خروجی برای Anki</a>` : ""}</div>
+    <div class="head"><div><h1>${tr(`مرور کارت‌ها`, `Review cards`)}</h1>
+      <p>${tr(`${fa(stats.due)} کارت برای امروز · ${fa(stats.total)} کارت در کل · زمان‌بندی با FSRS`, `${fa(stats.due)} cards due today · ${fa(stats.total)} cards total · scheduled with FSRS`)}</p></div>
+      ${all.length ? `<a class="btn" href="/api/cards/export.tsv">${tr(`خروجی برای Anki`, `Export for Anki`)}</a>` : ""}</div>
     <div class="review" id="rev"></div>
-    <h2>همه‌ی کارت‌ها</h2>
-    <div class="card tablebox" style="padding:0">${all.length ? `<table><thead><tr><th>کلمه</th><th>معنی</th><th>کتاب</th><th>مرور بعدی</th><th></th></tr></thead><tbody>
-      ${all.map(c => `<tr><td class="en">${esc(c.front)}</td><td>${esc(c.back)}</td><td class="small">${esc(c.book_title || "")}${c.page ? " · ص " + fa(c.page) : ""}</td>
-      <td class="small">${relTime(c.due)}</td><td><button class="btn sm ghost danger" data-del="${c.id}">حذف</button></td></tr>`).join("")}</tbody></table>`
-      : `<p style="padding:20px" class="muted">هنوز کارتی نساخته‌ای. در صفحه‌ی خواندن، کلمه‌ای از متن انگلیسی را انتخاب کن تا معنی‌اش بیاید و به کارت‌ها اضافه شود.</p>`}</div></div>`;
+    <h2>${tr(`همه‌ی کارت‌ها`, `All cards`)}</h2>
+    <div class="card tablebox" style="padding:0">${all.length ? `<table><thead><tr><th>${tr("کلمه", "Word")}</th><th>${tr("معنی", "Meaning")}</th><th>${tr("کتاب", "Book")}</th><th>${tr("مرور بعدی", "Next review")}</th><th></th></tr></thead><tbody>
+      ${all.map(c => `<tr><td class="en">${esc(c.front)}</td><td>${esc(c.back)}</td><td class="small">${esc(c.book_title || "")}${c.page ? tr(" · ص ", " · p. ") + fa(c.page) : ""}</td>
+      <td class="small">${relTime(c.due)}</td><td><button class="btn sm ghost danger" data-del="${c.id}">${tr("حذف", "Delete")}</button></td></tr>`).join("")}</tbody></table>`
+      : `<p style="padding:20px" class="muted">${tr(`هنوز کارتی نساخته‌ای. در صفحه‌ی خواندن، کلمه‌ای از متن انگلیسی را انتخاب کن تا معنی‌اش بیاید و به کارت‌ها اضافه شود.`, `No cards yet. While reading, select a word in the English text to see its meaning and add it to your cards.`)}</p>`}</div></div>`;
   $$("[data-del]").forEach(b => b.onclick = async () => { await api(`/api/cards/${b.dataset.del}`, { method: "DELETE" }); route(); });
 
   let i = 0, flipped = false;
   const rev = $("#rev");
   const show = () => {
     if (i >= due.length) {
-      rev.innerHTML = `<div class="fcard"><b style="font-size:1.2rem">${due.length ? "مرور امروز تمام شد" : "کارتی برای مرور نمانده"}</b><span class="muted small">کارت‌ها طبق برنامه‌ی FSRS دوباره ظاهر می‌شوند.</span></div>`;
+      rev.innerHTML = `<div class="fcard"><b style="font-size:1.2rem">${due.length ? tr("مرور امروز تمام شد", "Today's review is done") : tr("کارتی برای مرور نمانده", "No cards left to review")}</b><span class="muted small">${tr(`کارت‌ها طبق برنامه‌ی FSRS دوباره ظاهر می‌شوند.`, `Cards come back according to the FSRS schedule.`)}</span></div>`;
       refreshDue(); return;
     }
     const c = due[i];
-    const CT = { vocab: "لغت", causal: "علت و مکانیزم", cloze: "جای‌خالی", scenario: "سناریوی کاربردی" };
+    const CT = { vocab: tr("لغت", "Vocabulary"), causal: tr("علت و مکانیزم", "Cause & mechanism"), cloze: tr("جای‌خالی", "Cloze"), scenario: tr("سناریوی کاربردی", "Applied scenario") };
     const isCloze = c.card_type === "cloze" || /\{\{.+?\}\}/.test(c.front || "");
     const frontHtml = isCloze
       ? esc(c.front).replace(/\{\{(.+?)\}\}/g, flipped ? "<mark>$1</mark>" : "<mark>[ _____ ]</mark>")
       : esc(c.front);
     const ctx = esc(c.context || "").replace(new RegExp(esc(c.front).replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i"), m => `<mark>${m}</mark>`);
-    rev.innerHTML = `<div class="muted small">${fa(i + 1)} از ${fa(due.length)} · <span class="pill cli2api">${CT[c.card_type] || "لغت"}</span></div>
+    rev.innerHTML = `<div class="muted small">${fa(i + 1)} ${tr("از", "of")} ${fa(due.length)} · <span class="pill cli2api">${CT[c.card_type] || CT.vocab}</span></div>
       <div class="fcard"><div class="front" dir="auto" style="${c.card_type && c.card_type !== "vocab" ? "font-family:var(--f-ui);font-size:1.3rem;line-height:1.8" : ""}">${frontHtml}</div>${c.context ? `<div class="ctx">${ctx}</div>` : ""}
-      ${flipped ? `<div class="back">${esc(c.back)}</div><div class="small muted">${esc(c.book_title || "")}${c.page ? " · ص " + fa(c.page) : ""}</div>` : ""}</div>
-      ${flipped ? `<div class="rates">${[["دوباره", 1], ["سخت", 2], ["خوب", 3], ["آسان", 4]].map(([t, r]) => `<button data-r="${r}">${t}<small>کلید ${fa(r)}</small></button>`).join("")}</div>`
-      : `<button class="btn primary" id="flip">نمایش معنی <span class="small">(فاصله)</span></button>`}`;
+      ${flipped ? `<div class="back">${esc(c.back)}</div><div class="small muted">${esc(c.book_title || "")}${c.page ? tr(" · ص ", " · p. ") + fa(c.page) : ""}</div>` : ""}</div>
+      ${flipped ? `<div class="rates">${[[tr("دوباره", "Again"), 1], [tr("سخت", "Hard"), 2], [tr("خوب", "Good"), 3], [tr("آسان", "Easy"), 4]].map(([t, r]) => `<button data-r="${r}">${t}<small>${tr("کلید", "key")} ${fa(r)}</small></button>`).join("")}</div>`
+      : `<button class="btn primary" id="flip">${tr("نمایش معنی", "Show meaning")} <span class="small">(${tr("فاصله", "Space")})</span></button>`}`;
     if (!flipped) $("#flip").onclick = () => { flipped = true; show(); };
     $$("[data-r]").forEach(b => b.onclick = () => rate(+b.dataset.r));
   };
@@ -1741,10 +1743,10 @@ async function Cards() {
 }
 function relTime(iso) {
   const d = (new Date(iso) - new Date()) / 36e5;
-  if (d <= 0) return "الان";
-  if (d < 1) return `${fa(Math.round(d * 60))} دقیقه‌ی دیگر`;
-  if (d < 24) return `${fa(Math.round(d))} ساعت دیگر`;
-  return `${fa(Math.round(d / 24))} روز دیگر`;
+  if (d <= 0) return tr("الان", "now");
+  if (d < 1) return tr(`${fa(Math.round(d * 60))} دقیقه‌ی دیگر`, `in ${fa(Math.round(d * 60))} min`);
+  if (d < 24) return tr(`${fa(Math.round(d))} ساعت دیگر`, `in ${fa(Math.round(d))} h`);
+  return tr(`${fa(Math.round(d / 24))} روز دیگر`, `in ${fa(Math.round(d / 24))} days`);
 }
 
 /* ---------------------------------------------------------------- settings */
@@ -1752,7 +1754,7 @@ async function fetchModels(provider, statusEl) {
   try {
     const { models } = await api(`/api/models/${provider}`);
     const dl = $(`#dl-${provider}`); if (dl) dl.innerHTML = models.map(m => `<option value="${esc(m)}">`).join("");
-    if (statusEl) { statusEl.className = "status-line ok"; statusEl.textContent = `متصل شد · ${fa(models.length)} مدل پیدا شد`; }
+    if (statusEl) { statusEl.className = "status-line ok"; statusEl.textContent = tr(`متصل شد · ${fa(models.length)} مدل پیدا شد`, `Connected · ${fa(models.length)} models found`); }
   } catch (e) {
     if (statusEl) { statusEl.className = "status-line bad"; statusEl.textContent = e.message; }
   }
@@ -1773,96 +1775,98 @@ async function Settings() {
   };
 
   view.innerHTML = `<div class="pagewrap-main">
-    <div class="head"><div><h1>تنظیمات</h1><p>اتصال مدل‌ها (CLI2API، Ollama و OpenAI اختصاصی)، انتخاب CLI و مدل برای هر کار، و سقف هزینه.</p></div></div>
+    <div class="head"><div><h1>${tr("تنظیمات", "Settings")}</h1><p>${tr("اتصال مدل‌ها (CLI2API، Ollama و OpenAI اختصاصی)، انتخاب CLI و مدل برای هر کار، و سقف هزینه.", "Model connections (CLI2API, Ollama and OpenAI-compatible), the CLI and model for each task, and the spending cap.")}</p></div>
+      <div class="field" style="min-width:180px"><label for="ui-lang">${tr("زبان رابط", "Interface language")}</label>
+        <select id="ui-lang"><option value="en" ${IS_FA ? "" : "selected"}>English</option><option value="fa" ${IS_FA ? "selected" : ""}>فارسی</option></select></div></div>
     <datalist id="dl-ollama"></datalist><datalist id="dl-openai"></datalist><datalist id="dl-cli2api"></datalist>
     <div class="settings">
       <div class="card wide">
-        <h2>کدام مدل برای کدام کار</h2>
-        <p class="small muted">برای هر کار می‌توانی <b>CLI2API</b>، <b>Ollama</b> یا <b>OpenAI</b> را انتخاب کنی. در حالت CLI2API اول CLI (مثل <code>agy</code>، <code>claude</code>، <code>codex</code>...) و بعد مدل داخل آن را انتخاب کن. کاری که مدل ندارد از مدل ترجمه‌ی پاراگرافی استفاده می‌کند.</p>
-        <div id="task-list">${Object.entries(tasks).map(([k, label]) => `
+        <h2>${tr(`کدام مدل برای کدام کار`, `Which model for which task`)}</h2>
+        <p class="small muted">${tr(`برای هر کار می‌توانی <b>CLI2API</b>، <b>Ollama</b> یا <b>OpenAI</b> را انتخاب کنی. در حالت CLI2API اول CLI (مثل <code>agy</code>، <code>claude</code>، <code>codex</code>...) و بعد مدل داخل آن را انتخاب کن. کاری که مدل ندارد از مدل ترجمه‌ی پاراگرافی استفاده می‌کند.`, `For each task you can choose <b>CLI2API</b>, <b>Ollama</b> or <b>OpenAI</b>. With CLI2API, pick the CLI first (<code>agy</code>, <code>claude</code>, <code>codex</code>…) and then a model inside it. Tasks without a model use the paragraph-translation model.`)}</p>
+        <div id="task-list">${Object.entries(tasks).map(([k, l]) => [k, trS(l)]).map(([k, label]) => `
           <div class="task" data-task="${k}"><b class="small">${label}</b>
-            <select data-prov aria-label="ارائه‌دهنده برای ${label}">
+            <select data-prov aria-label="${tr(`ارائه‌دهنده برای ${label}`, `Provider for ${label}`)}">
               <option value="cli2api" ${s.tasks[k].provider === "cli2api" ? "selected" : ""}>CLI2API</option>
               <option value="ollama" ${s.tasks[k].provider === "ollama" ? "selected" : ""}>Ollama</option>
               <option value="openai" ${s.tasks[k].provider === "openai" ? "selected" : ""}>OpenAI</option>
             </select>
             <div class="task-model-cell" data-cell>
-              <input data-model class="ltr" list="dl-${s.tasks[k].provider}" value="${esc(s.tasks[k].model)}" placeholder="${k === "translate_para" ? "نام مدل" : "خالی = همان مدل ترجمه‌ی پاراگرافی"}" aria-label="مدل برای ${label}">
+              <input data-model class="ltr" list="dl-${s.tasks[k].provider}" value="${esc(s.tasks[k].model)}" placeholder="${k === "translate_para" ? tr("نام مدل", "Model name") : tr("خالی = همان مدل ترجمه‌ی پاراگرافی", "Empty = same as paragraph translation")}" aria-label="${tr(`مدل برای ${label}`, `Model for ${label}`)}">
             </div>
           </div>`).join("")}</div>
       </div>
       <div class="card wide">
-        <h2><span class="pill cli2api">CLI2API</span> اتصال به CLIهای محلی (agy، claude، codex و…)</h2>
+        <h2><span class="pill cli2api">CLI2API</span> ${tr(`اتصال به CLIهای محلی (agy، claude، codex و…)`, `Connect to local CLIs (agy, claude, codex, …)`)}</h2>
         <div class="r2">
-          ${f("c2-url", "آدرس سرور CLI2API", cli2.base_url || "http://127.0.0.1:8787", "url", "پیش‌فرض: http://127.0.0.1:8787", "ltr")}
-          <div class="field"><label for="c2-cli">CLI پیش‌فرض</label>
+          ${f("c2-url", tr("آدرس سرور CLI2API", "CLI2API server URL"), cli2.base_url || "http://127.0.0.1:8787", "url", tr("پیش‌فرض: http://127.0.0.1:8787", "Default: http://127.0.0.1:8787"), "ltr")}
+          <div class="field"><label for="c2-cli">${tr("CLI پیش‌فرض", "Default CLI")}</label>
             <select id="c2-cli" class="ltr"><option value="${esc(cli2.default_cli || "agy")}">${esc(cli2.default_cli || "agy")}</option></select>
-            <span class="hint">مدل‌های agy روی حالت <b>low</b> اجرا می‌شوند.</span></div>
+            <span class="hint">${tr(`مدل‌های agy روی حالت <b>low</b> اجرا می‌شوند.`, `agy models run in <b>low</b> mode.`)}</span></div>
         </div>
         <div class="r2">
-          ${f("c2-dir", "مسیر پوشه‌ی cli_to_api (اختیاری)", cli2.cli_to_api_dir || "", "text", "خالی = نسخه‌ی همراه برنامه (CLI_to_API)", "ltr")}
-          <div class="field"><label for="c2-key">کلید API (اختیاری)</label>
-            <div style="display:flex;gap:8px"><input id="c2-key" type="password" class="ltr" autocomplete="off" placeholder="${cli2.has_key ? "ذخیره شده: " + esc(cli2.api_key_masked) : "اگر روی cli2api کلید نگذاشتی خالی بگذار"}">
-            ${cli2.has_key ? `<button class="btn ghost danger" id="c2-del">حذف</button>` : ""}</div></div>
+          ${f("c2-dir", tr("مسیر پوشه‌ی cli_to_api (اختیاری)", "cli_to_api folder path (optional)"), cli2.cli_to_api_dir || "", "text", tr("خالی = نسخه‌ی همراه برنامه (CLI_to_API)", "Empty = the bundled copy (CLI_to_API)"), "ltr")}
+          <div class="field"><label for="c2-key">${tr("کلید API (اختیاری)", "API key (optional)")}</label>
+            <div style="display:flex;gap:8px"><input id="c2-key" type="password" class="ltr" autocomplete="off" placeholder="${cli2.has_key ? tr("ذخیره شده: ", "Saved: ") + esc(cli2.api_key_masked) : tr("اگر روی cli2api کلید نگذاشتی خالی بگذار", "Leave empty if cli2api has no key")}">
+            ${cli2.has_key ? `<button class="btn ghost danger" id="c2-del">${tr("حذف", "Delete")}</button>` : ""}</div></div>
         </div>
         <div class="r3">
-          ${f("c2-timeout", "timeout (ثانیه)", cli2.timeout ?? 300, "number")}
-          <div style="display:flex;align-items:center">${c("c2-auto", "اجرای خودکار سرور CLI2API", cli2.auto_start !== false)}</div>
-          <div style="display:flex;align-items:center">${c("c2-json", "JSON mode برای واژه‌نامه و معنی کلمه", cli2.json_mode !== false)}</div>
+          ${f("c2-timeout", tr("timeout (ثانیه)", "timeout (seconds)"), cli2.timeout ?? 300, "number")}
+          <div style="display:flex;align-items:center">${c("c2-auto", tr("اجرای خودکار سرور CLI2API", "Start the CLI2API server automatically"), cli2.auto_start !== false)}</div>
+          <div style="display:flex;align-items:center">${c("c2-json", tr("JSON mode برای واژه‌نامه و معنی کلمه", "JSON mode for glossary and word lookup"), cli2.json_mode !== false)}</div>
         </div>
         <div class="cli-pills" id="c2-clis"></div>
-        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><button class="btn" id="c2-test">اتصال و دریافت CLIها و مدل‌ها</button><span class="status-line" id="c2-st"></span></div>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><button class="btn" id="c2-test">${tr(`اتصال و دریافت CLIها و مدل‌ها`, `Connect and fetch CLIs & models`)}</button><span class="status-line" id="c2-st"></span></div>
       </div>
       <div class="card">
-        <h2><span class="pill ollama">Ollama</span> روی همین کامپیوتر</h2>
-        ${f("ol-url", "آدرس سرور", s.ollama.base_url, "url", "", "ltr")}
-        <div class="r3">${f("ol-ctx", "num_ctx پاراگرافی", s.ollama.num_ctx, "number")}${f("ol-ctxp", "num_ctx صفحه‌ای", s.ollama.num_ctx_page, "number")}${f("ol-temp", "temperature", s.ollama.temperature, "number")}</div>
-        <div class="r2">${f("ol-keep", "keep_alive", s.ollama.keep_alive, "text", "مدت ماندن مدل در حافظه، مثل 30m", "ltr")}
-          <div class="field"><label for="ol-fb">مدل جایگزین وقتی سقف OpenAI پر شود</label><input id="ol-fb" list="dl-ollama" class="ltr" value="${esc(s.ollama.fallback_model)}"></div></div>
-        <div class="field"><label for="ol-emb">مدل جست‌وجوی معنایی (embedding)</label><input id="ol-emb" list="dl-ollama" class="ltr" value="${esc(s.ollama.embed_model || "")}" placeholder="bge-m3">
-          <span class="hint">برای جست‌وجوی فارسی و انگلیسی، مدل چندزبانه مثل bge-m3 (با ollama pull bge-m3 نصب می‌شود). خالی = جست‌وجو فقط بر اساس کلمه.</span></div>
-        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><button class="btn" id="ol-test">اتصال و دریافت مدل‌ها</button><span class="status-line" id="ol-st"></span></div>
+        <h2><span class="pill ollama">Ollama</span> ${tr("روی همین کامپیوتر", "on this computer")}</h2>
+        ${f("ol-url", tr("آدرس سرور", "Server URL"), s.ollama.base_url, "url", "", "ltr")}
+        <div class="r3">${f("ol-ctx", tr("num_ctx پاراگرافی", "num_ctx (paragraph)"), s.ollama.num_ctx, "number")}${f("ol-ctxp", tr("num_ctx صفحه‌ای", "num_ctx (page)"), s.ollama.num_ctx_page, "number")}${f("ol-temp", "temperature", s.ollama.temperature, "number")}</div>
+        <div class="r2">${f("ol-keep", "keep_alive", s.ollama.keep_alive, "text", tr("مدت ماندن مدل در حافظه، مثل 30m", "How long the model stays loaded, e.g. 30m"), "ltr")}
+          <div class="field"><label for="ol-fb">${tr(`مدل جایگزین وقتی سقف OpenAI پر شود`, `Fallback model when the OpenAI cap is reached`)}</label><input id="ol-fb" list="dl-ollama" class="ltr" value="${esc(s.ollama.fallback_model)}"></div></div>
+        <div class="field"><label for="ol-emb">${tr(`مدل جست‌وجوی معنایی (embedding)`, `Semantic search model (embedding)`)}</label><input id="ol-emb" list="dl-ollama" class="ltr" value="${esc(s.ollama.embed_model || "")}" placeholder="bge-m3">
+          <span class="hint">${tr(`برای جست‌وجوی فارسی و انگلیسی، مدل چندزبانه مثل bge-m3 (با ollama pull bge-m3 نصب می‌شود). خالی = جست‌وجو فقط بر اساس کلمه.`, `For Persian and English search, use a multilingual model like bge-m3 (install with ollama pull bge-m3). Empty = keyword search only.`)}</span></div>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><button class="btn" id="ol-test">${tr("اتصال و دریافت مدل‌ها", "Connect and fetch models")}</button><span class="status-line" id="ol-st"></span></div>
       </div>
       <div class="card">
-        <h2><span class="pill openai">OpenAI</span> یا هر API سازگار</h2>
-        ${f("oa-url", "Base URL", s.openai.base_url, "url", "برای endpoint اختصاصی، آدرس خودش تا /v1", "ltr")}
-        <div class="field"><label for="oa-key">کلید API</label>
-          <div style="display:flex;gap:8px"><input id="oa-key" type="password" class="ltr" autocomplete="off" placeholder="${s.openai.has_key ? "ذخیره شده: " + esc(s.openai.api_key_masked) : "sk-…"}">
-          ${s.openai.has_key ? `<button class="btn ghost danger" id="oa-del">حذف</button>` : ""}</div>
-          <span class="hint">فقط روی همین کامپیوتر در data/settings.json ذخیره می‌شود. برای تغییر، کلید جدید را بنویس.</span></div>
-        <div class="r2"><div class="field"><label for="oa-auth">احراز هویت</label><select id="oa-auth"><option value="bearer" ${s.openai.auth !== "api-key" ? "selected" : ""}>Authorization: Bearer</option><option value="api-key" ${s.openai.auth === "api-key" ? "selected" : ""}>api-key (Azure)</option></select></div>
-          ${f("oa-ver", "api-version (فقط Azure)", s.openai.api_version, "text", "", "ltr")}</div>
-        <div class="r2">${c("oa-json", "JSON mode برای واژه‌نامه و معنی کلمه", s.openai.json_mode)}${c("oa-st", "ارسال temperature", s.openai.send_temperature)}</div>
-        <div class="r2">${f("oa-temp", "temperature", s.openai.temperature, "number", "بعضی مدل‌های جدید temperature قبول نمی‌کنند؛ پیش‌فرض خاموش است.")}${f("oa-timeout", "timeout (ثانیه)", s.openai.timeout, "number")}</div>
-        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><button class="btn" id="oa-test">اتصال و دریافت مدل‌ها</button><span class="status-line" id="oa-st2"></span></div>
+        <h2><span class="pill openai">OpenAI</span> ${tr(`یا هر API سازگار`, `or any compatible API`)}</h2>
+        ${f("oa-url", "Base URL", s.openai.base_url, "url", tr("برای endpoint اختصاصی، آدرس خودش تا /v1", "For a custom endpoint, its URL up to /v1"), "ltr")}
+        <div class="field"><label for="oa-key">${tr("کلید API", "API key")}</label>
+          <div style="display:flex;gap:8px"><input id="oa-key" type="password" class="ltr" autocomplete="off" placeholder="${s.openai.has_key ? tr("ذخیره شده: ", "Saved: ") + esc(s.openai.api_key_masked) : "sk-…"}">
+          ${s.openai.has_key ? `<button class="btn ghost danger" id="oa-del">${tr("حذف", "Delete")}</button>` : ""}</div>
+          <span class="hint">${tr(`فقط روی همین کامپیوتر در data/settings.json ذخیره می‌شود. برای تغییر، کلید جدید را بنویس.`, `Stored only on this computer, in data/settings.json. To change it, type a new key.`)}</span></div>
+        <div class="r2"><div class="field"><label for="oa-auth">${tr("احراز هویت", "Authentication")}</label><select id="oa-auth"><option value="bearer" ${s.openai.auth !== "api-key" ? "selected" : ""}>Authorization: Bearer</option><option value="api-key" ${s.openai.auth === "api-key" ? "selected" : ""}>api-key (Azure)</option></select></div>
+          ${f("oa-ver", tr("api-version (فقط Azure)", "api-version (Azure only)"), s.openai.api_version, "text", "", "ltr")}</div>
+        <div class="r2">${c("oa-json", tr("JSON mode برای واژه‌نامه و معنی کلمه", "JSON mode for glossary and word lookup"), s.openai.json_mode)}${c("oa-st", tr("ارسال temperature", "Send temperature"), s.openai.send_temperature)}</div>
+        <div class="r2">${f("oa-temp", "temperature", s.openai.temperature, "number", tr("بعضی مدل‌های جدید temperature قبول نمی‌کنند؛ پیش‌فرض خاموش است.", "Some newer models reject temperature; off by default."))}${f("oa-timeout", tr("timeout (ثانیه)", "timeout (seconds)"), s.openai.timeout, "number")}</div>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><button class="btn" id="oa-test">${tr("اتصال و دریافت مدل‌ها", "Connect and fetch models")}</button><span class="status-line" id="oa-st2"></span></div>
       </div>
       <div class="card">
-        <h2>بودجه‌ی OpenAI</h2>
-        ${f("b-cap", "سقف ماهانه (توکن ورودی + خروجی)", s.budget.monthly_token_cap, "number", "۰ یعنی بدون سقف")}
-        <div class="r2">${f("b-pin", "قیمت ۱ میلیون توکن ورودی ($)", s.budget.price_in_per_m, "number")}${f("b-pout", "قیمت ۱ میلیون توکن خروجی ($)", s.budget.price_out_per_m, "number")}</div>
-        <span class="hint small muted">قیمت‌ها فقط برای نمایش هزینه‌ی تخمینی است.</span>
-        ${c("b-fb", "وقتی سقف پر شد، ترجمه با Ollama ادامه پیدا کند", s.budget.fallback_to_ollama)}
+        <h2>${tr(`بودجه‌ی OpenAI`, `OpenAI budget`)}</h2>
+        ${f("b-cap", tr("سقف ماهانه (توکن ورودی + خروجی)", "Monthly cap (input + output tokens)"), s.budget.monthly_token_cap, "number", tr("۰ یعنی بدون سقف", "0 means no cap"))}
+        <div class="r2">${f("b-pin", tr("قیمت ۱ میلیون توکن ورودی ($)", "Price per 1M input tokens ($)"), s.budget.price_in_per_m, "number")}${f("b-pout", tr("قیمت ۱ میلیون توکن خروجی ($)", "Price per 1M output tokens ($)"), s.budget.price_out_per_m, "number")}</div>
+        <span class="hint small muted">${tr(`قیمت‌ها فقط برای نمایش هزینه‌ی تخمینی است.`, `Prices are only used to show an estimated cost.`)}</span>
+        ${c("b-fb", tr("وقتی سقف پر شد، ترجمه با Ollama ادامه پیدا کند", "When the cap is reached, continue translating with Ollama"), s.budget.fallback_to_ollama)}
       </div>
       <div class="card">
-        <h2>ترجمه و یادگیری عمیق</h2>
-        <div class="r3">${f("r-pco", "طول تکه (Ollama)", s.reading.page_chunk_chars_ollama, "number", "کاراکتر در هر درخواست")}
-          ${f("r-pca", "طول تکه (OpenAI)", s.reading.page_chunk_chars_openai, "number")}
-          ${f("r-pcc", "طول تکه (CLI2API)", s.reading.page_chunk_chars_cli2api ?? 6000, "number")}</div>
+        <h2>${tr(`ترجمه و یادگیری عمیق`, `Translation & deep study`)}</h2>
+        <div class="r3">${f("r-pco", tr("طول تکه (Ollama)", "Chunk length (Ollama)"), s.reading.page_chunk_chars_ollama, "number", tr("کاراکتر در هر درخواست", "characters per request"))}
+          ${f("r-pca", tr("طول تکه (OpenAI)", "Chunk length (OpenAI)"), s.reading.page_chunk_chars_openai, "number")}
+          ${f("r-pcc", tr("طول تکه (CLI2API)", "Chunk length (CLI2API)"), s.reading.page_chunk_chars_cli2api ?? 6000, "number")}</div>
         <div class="r2">
-          ${f("r-dom", "حوزه‌ی تخصصی من (برای قیاس‌ها)", s.reading.user_domain || "مهندسی نرم‌افزار و هوش مصنوعی", "text", "در توضیح سطح ۴، مثال‌ها با این حوزه قیاس می‌شوند")}
-          ${f("r-obs", "پوشه‌ی Obsidian Vault (اختیاری)", s.reading.obsidian_vault || "", "text", "برای همگام‌سازی مستقیم فایل‌های .md", "ltr")}
+          ${f("r-dom", tr("حوزه‌ی تخصصی من (برای قیاس‌ها)", "My field (for analogies)"), s.reading.user_domain || "مهندسی نرم‌افزار و هوش مصنوعی", "text", tr("در توضیح سطح ۴، مثال‌ها با این حوزه قیاس می‌شوند", "Level-4 explanations draw analogies from this field"))}
+          ${f("r-obs", tr("پوشه‌ی Obsidian Vault (اختیاری)", "Obsidian vault folder (optional)"), s.reading.obsidian_vault || "", "text", tr("برای همگام‌سازی مستقیم فایل‌های .md", "For syncing .md files directly"), "ltr")}
         </div>
-        ${c("r-ag", "بعد از افزودن کتاب، واژه‌نامه خودکار ساخته شود", s.reading.auto_glossary)}
+        ${c("r-ag", tr("بعد از افزودن کتاب، واژه‌نامه خودکار ساخته شود", "Build the glossary automatically after adding a book"), s.reading.auto_glossary)}
       </div>
-      <div class="card wide" id="phone"><h2>خواندن روی گوشی</h2><p class="small muted">در حال بارگذاری…</p></div>
+      <div class="card wide" id="phone"><h2>${tr("خواندن روی گوشی", "Read on your phone")}</h2><p class="small muted">${tr(`در حال بارگذاری…`, `Loading…`)}</p></div>
       <div class="card wide">
-        <h2>مصرف این ماه (${esc(u.month)})</h2>
-        ${u.rows.length ? `<div class="tablebox"><table><thead><tr><th>مدل</th><th>درخواست</th><th>توکن ورودی</th><th>توکن خروجی</th></tr></thead><tbody>
+        <h2>${tr(`مصرف این ماه (${esc(u.month)})`, `Usage this month (${esc(u.month)})`)}</h2>
+        ${u.rows.length ? `<div class="tablebox"><table><thead><tr><th>${tr("مدل", "Model")}</th><th>${tr("درخواست", "Requests")}</th><th>${tr("توکن ورودی", "Input tokens")}</th><th>${tr("توکن خروجی", "Output tokens")}</th></tr></thead><tbody>
           ${u.rows.map(r => `<tr><td>${providerPill(r.provider, r.model)}</td><td>${fa(r.calls)}</td><td>${fa(r.in_tok)}</td><td>${fa(r.out_tok)}</td></tr>`).join("")}
-          </tbody></table></div><p class="small muted">OpenAI: ${fa(u.openai_tokens)} از ${u.cap ? fa(u.cap) : "∞"} توکن${u.cost ? ` · حدود $${u.cost.toFixed(2)}` : ""}</p>` : `<p class="muted small">هنوز درخواستی ثبت نشده.</p>`}
+          </tbody></table></div><p class="small muted">OpenAI: ${tr(`${fa(u.openai_tokens)} از ${u.cap ? fa(u.cap) : "∞"} توکن`, `${fa(u.openai_tokens)} of ${u.cap ? fa(u.cap) : "∞"} tokens`)}${u.cost ? ` · ${tr("حدود", "about")} $${u.cost.toFixed(2)}` : ""}</p>` : `<p class="muted small">${tr(`هنوز درخواستی ثبت نشده.`, `No requests yet.`)}</p>`}
       </div>
     </div>
-    <div class="savebar"><button class="btn primary" id="save">ذخیره‌ی تنظیمات</button></div></div>`;
+    <div class="savebar"><button class="btn primary" id="save">${tr(`ذخیره‌ی تنظیمات`, `Save settings`)}</button></div></div>`;
 
   function splitCliModel(val) {
     const v = (val || "").trim();
@@ -1896,7 +1900,7 @@ async function Settings() {
     const cell = $("[data-cell]", row);
     const val = initialVal !== undefined ? initialVal : readTaskModel(row);
     if (prov !== "cli2api") {
-      cell.innerHTML = `<input data-model class="ltr" list="dl-${prov}" value="${esc(val)}" placeholder="${k === "translate_para" ? "نام مدل" : "خالی = همان مدل ترجمه‌ی پاراگرافی"}" aria-label="مدل">`;
+      cell.innerHTML = `<input data-model class="ltr" list="dl-${prov}" value="${esc(val)}" placeholder="${k === "translate_para" ? tr("نام مدل", "Model name") : tr("خالی = همان مدل ترجمه‌ی پاراگرافی", "Empty = same as paragraph translation")}" aria-label="${tr("مدل", "Model")}">`;
       return;
     }
     const parsed = splitCliModel(val);
@@ -1907,8 +1911,8 @@ async function Settings() {
       + (!provIds.includes(curCli) ? `<option value="${esc(curCli)}" selected>${esc(curCli)}</option>` : "");
 
     cell.innerHTML = `<select data-cli class="ltr" aria-label="CLI">${cliOptions}</select>
-      <select data-cli-model class="ltr" aria-label="مدل CLI"></select>
-      <input data-cli-custom class="ltr" placeholder="نام مدل دلخواه…" hidden>`;
+      <select data-cli-model class="ltr" aria-label="${tr("مدل CLI", "CLI model")}"></select>
+      <input data-cli-custom class="ltr" placeholder="${tr(`نام مدل دلخواه…`, `Custom model name…`)}" hidden>`;
 
     const cliSel = $("[data-cli]", cell);
     const modSel = $("[data-cli-model]", cell);
@@ -1920,16 +1924,16 @@ async function Settings() {
       const subs = list.map(x => x.submodel);
       let opts = "";
       if (k !== "translate_para") {
-        opts += `<option value="__inherit__" ${isInherit ? "selected" : ""}>— همان مدل ترجمه‌ی پاراگرافی —</option>`;
+        opts += `<option value="__inherit__" ${isInherit ? "selected" : ""}>${tr(`— همان مدل ترجمه‌ی پاراگرافی —`, `— same as paragraph translation —`)}</option>`;
       }
       if (!list.length) {
-        opts += `<option value="__default__" ${!isInherit && !selectedSub ? "selected" : ""}>پیش‌فرض ${esc(cli)}</option>`;
+        opts += `<option value="__default__" ${!isInherit && !selectedSub ? "selected" : ""}>${tr("پیش‌فرض", "Default")} ${esc(cli)}</option>`;
       } else {
         opts += list.map(m => `<option value="${esc(m.submodel)}" ${!isInherit && m.submodel === selectedSub ? "selected" : ""}>${esc(m.label || m.submodel)}</option>`).join("");
-        opts += `<option value="__default__" ${!isInherit && !selectedSub ? "selected" : ""}>پیش‌فرض ${esc(cli)}</option>`;
+        opts += `<option value="__default__" ${!isInherit && !selectedSub ? "selected" : ""}>${tr("پیش‌فرض", "Default")} ${esc(cli)}</option>`;
       }
       const isCustom = !isInherit && selectedSub && !subs.includes(selectedSub);
-      opts += `<option value="__custom__" ${isCustom ? "selected" : ""}>مدل دلخواه…</option>`;
+      opts += `<option value="__custom__" ${isCustom ? "selected" : ""}>${tr("مدل دلخواه…", "Custom model…")}</option>`;
       modSel.innerHTML = opts;
       if (isCustom) {
         customInp.hidden = false;
@@ -1969,7 +1973,7 @@ async function Settings() {
   });
 
   async function loadCliCatalog(statusEl, refresh = false) {
-    if (statusEl) { statusEl.className = "status-line"; statusEl.textContent = "در حال اتصال به CLI2API…"; }
+    if (statusEl) { statusEl.className = "status-line"; statusEl.textContent = tr("در حال اتصال به CLI2API…", "Connecting to CLI2API…"); }
     try {
       const cat = await api(`/api/cli2api/catalog${refresh ? "?refresh=true" : ""}`);
       cliCatalog = cat;
@@ -1988,7 +1992,7 @@ async function Settings() {
           renderTaskCell(row, readTaskModel(row));
         }
       });
-      if (statusEl) { statusEl.className = "status-line ok"; statusEl.textContent = `متصل شد · ${fa(cat.providers.length)} CLI و ${fa((cat.all_models || []).length)} مدل پیدا شد`; }
+      if (statusEl) { statusEl.className = "status-line ok"; statusEl.textContent = tr(`متصل شد · ${fa(cat.providers.length)} CLI و ${fa((cat.all_models || []).length)} مدل پیدا شد`, `Connected · found ${fa(cat.providers.length)} CLIs and ${fa((cat.all_models || []).length)} models`); }
     } catch (e) {
       if (statusEl) { statusEl.className = "status-line bad"; statusEl.textContent = e.message; }
     }
@@ -2015,59 +2019,60 @@ async function Settings() {
     const c2key = $("#c2-key").value.trim(); if (c2key) body.cli2api.api_key = c2key;
     return body;
   };
-  const save = async quiet => { await api("/api/settings", { method: "PUT", body: collect() }); if (!quiet) toast("تنظیمات ذخیره شد"); };
+  const save = async quiet => { await api("/api/settings", { method: "PUT", body: collect() }); if (!quiet) toast(tr("تنظیمات ذخیره شد", "Settings saved")); };
   $("#save").onclick = async () => { try { await save(); route(); } catch (e) { toast(e.message, true); } };
   $("#c2-test").onclick = async () => { await save(true); $("#c2-key").value = ""; loadCliCatalog($("#c2-st"), true); };
   $("#ol-test").onclick = async () => { await save(true); fetchModels("ollama", $("#ol-st")); };
   $("#oa-test").onclick = async () => { await save(true); $("#oa-key").value = ""; fetchModels("openai", $("#oa-st2")); };
-  if ($("#oa-del")) $("#oa-del").onclick = async () => { await api("/api/settings/openai-key", { method: "DELETE" }); toast("کلید حذف شد"); route(); };
-  if ($("#c2-del")) $("#c2-del").onclick = async () => { await api("/api/settings/cli2api-key", { method: "DELETE" }); toast("کلید CLI2API حذف شد"); route(); };
+  if ($("#oa-del")) $("#oa-del").onclick = async () => { await api("/api/settings/openai-key", { method: "DELETE" }); toast(tr("کلید حذف شد", "Key deleted")); route(); };
+  if ($("#c2-del")) $("#c2-del").onclick = async () => { await api("/api/settings/cli2api-key", { method: "DELETE" }); toast(tr("کلید CLI2API حذف شد", "CLI2API key deleted")); route(); };
   loadCliCatalog($("#c2-st"), false);
   fetchModels("ollama", $("#ol-st"));
   if (s.openai.has_key) fetchModels("openai", $("#oa-st2"));
+  $("#ui-lang").onchange = e => setLang(e.target.value);
   phoneCard();
 }
 
 async function phoneCard() {
   const el = $("#phone"); if (!el) return;
   let d;
-  try { d = await api("/api/server"); } catch (e) { el.innerHTML = `<h2>خواندن روی گوشی</h2><div class="error-box">${esc(e.message)}</div>`; return; }
+  try { d = await api("/api/server"); } catch (e) { el.innerHTML = `<h2>${tr("خواندن روی گوشی", "Read on your phone")}</h2><div class="error-box">${esc(e.message)}</div>`; return; }
   const pending = d.lan !== d.active;
-  el.innerHTML = `<h2>خواندن روی گوشی</h2>
+  el.innerHTML = `<h2>${tr("خواندن روی گوشی", "Read on your phone")}</h2>
     <div class="phone">
       <div class="phone-text">
-        <label class="check"><input type="checkbox" id="lan" ${d.lan ? "checked" : ""}> اجازه بده گوشی‌ام از طریق Wi-Fi خانه به ورق وصل شود</label>
-        ${pending ? `<div class="banner" style="margin-top:8px"><span>${d.lan ? "برای روشن شدن" : "برای خاموش شدن"}، پنجره‌ی ورق را ببند و دوباره <b>run.bat</b> را اجرا کن.</span></div>` : ""}
+        <label class="check"><input type="checkbox" id="lan" ${d.lan ? "checked" : ""}> ${tr(`اجازه بده گوشی‌ام از طریق Wi-Fi خانه به ورق وصل شود`, `Let my phone connect to Varagh over home Wi-Fi`)}</label>
+        ${pending ? `<div class="banner" style="margin-top:8px"><span>${d.lan ? tr("برای روشن شدن، پنجره‌ی ورق را ببند و دوباره <b>run.bat</b> را اجرا کن.", "To turn this on, close the Varagh window and run <b>run.bat</b> (or run.sh) again.") : tr("برای خاموش شدن، پنجره‌ی ورق را ببند و دوباره <b>run.bat</b> را اجرا کن.", "To turn this off, close the Varagh window and run <b>run.bat</b> (or run.sh) again.")}</span></div>` : ""}
         ${d.active ? `<ol class="small">
-          <li>گوشی و لپ‌تاپ باید به یک Wi-Fi وصل باشند.</li>
-          <li>کد QR را با دوربین گوشی اسکن کن (یا لینک را در مرورگر گوشی باز کن). این لینک یک کد ورود دارد؛ دستگاه‌های دیگر بدون آن راه ندارند.</li>
-          <li>در مرورگر گوشی «Add to Home screen» را بزن تا ورق مثل یک اپ روی صفحه‌ی اصلی بنشیند.</li>
-          <li>اگر ویندوز پرسید، به Python اجازه‌ی دسترسی در «Private networks» بده.</li></ol>
+          <li>${tr(`گوشی و لپ‌تاپ باید به یک Wi-Fi وصل باشند.`, `Your phone and laptop must be on the same Wi-Fi.`)}</li>
+          <li>${tr(`کد QR را با دوربین گوشی اسکن کن (یا لینک را در مرورگر گوشی باز کن). این لینک یک کد ورود دارد؛ دستگاه‌های دیگر بدون آن راه ندارند.`, `Scan the QR code with your phone's camera (or open the link in the phone's browser). The link carries a login code; other devices can't get in without it.`)}</li>
+          <li>${tr(`در مرورگر گوشی «Add to Home screen» را بزن تا ورق مثل یک اپ روی صفحه‌ی اصلی بنشیند.`, `In the phone's browser, tap “Add to Home screen” so Varagh sits on your home screen like an app.`)}</li>
+          <li>${tr(`اگر ویندوز پرسید، به Python اجازه‌ی دسترسی در «Private networks» بده.`, `If Windows asks, allow Python access on “Private networks”.`)}</li></ol>
           ${d.urls.map(u => `<code class="url" dir="ltr">${esc(u)}</code>`).join("")}
-          <div class="row-acts"><button class="btn sm ghost" id="tok">ساختن کد ورود تازه (دستگاه‌های قبلی خارج می‌شوند)</button></div>`
-        : `<p class="small muted">وقتی روشن باشد، ورق روی همین لپ‌تاپ اجرا می‌شود و گوشی فقط صفحه‌ها را نشان می‌دهد؛ پس لپ‌تاپ باید روشن باشد.</p>`}
-        <p class="small muted">بدون لپ‌تاپ و بدون اینترنت: از زبانه‌ی «مرور» در صفحه‌ی خواندن، فصل یا کل کتاب را به یک فایل HTML تبدیل کن و روی گوشی باز کن. (نصب کامل آفلاین مرورگرها فقط روی HTTPS ممکن است.)</p>
+          <div class="row-acts"><button class="btn sm ghost" id="tok">${tr(`ساختن کد ورود تازه (دستگاه‌های قبلی خارج می‌شوند)`, `Create a new login code (signs out other devices)`)}</button></div>`
+        : `<p class="small muted">${tr(`وقتی روشن باشد، ورق روی همین لپ‌تاپ اجرا می‌شود و گوشی فقط صفحه‌ها را نشان می‌دهد؛ پس لپ‌تاپ باید روشن باشد.`, `When on, Varagh still runs on this laptop and the phone just shows the pages, so the laptop must stay on.`)}</p>`}
+        <p class="small muted">${tr(`بدون لپ‌تاپ و بدون اینترنت: از زبانه‌ی «مرور» در صفحه‌ی خواندن، فصل یا کل کتاب را به یک فایل HTML تبدیل کن و روی گوشی باز کن. (نصب کامل آفلاین مرورگرها فقط روی HTTPS ممکن است.)`, `Without the laptop or internet: from the “Review” tab in the reader, export a chapter or the whole book as an HTML file and open it on your phone. (Full offline install in browsers only works over HTTPS.)`)}</p>
       </div>
-      ${d.active && d.qr ? `<div class="qr" aria-label="کد QR برای باز کردن ورق روی گوشی">${d.qr}</div>` : ""}
+      ${d.active && d.qr ? `<div class="qr" aria-label="${tr(`کد QR برای باز کردن ورق روی گوشی`, `QR code to open Varagh on your phone`)}">${d.qr}</div>` : ""}
     </div>`;
   const box = document.createElement("div");
   box.className = "card wide"; box.id = "datacard";
-  box.innerHTML = `<h2>داده‌ها</h2>
-    <p class="small muted">کتاب‌ها، ترجمه‌ها، کارت‌ها و تنظیمات این‌جا نگه داشته می‌شوند. برای پشتیبان‌گیری همین پوشه را کپی کن:</p>
+  box.innerHTML = `<h2>${tr("داده‌ها", "Data")}</h2>
+    <p class="small muted">${tr(`کتاب‌ها، ترجمه‌ها، کارت‌ها و تنظیمات این‌جا نگه داشته می‌شوند. برای پشتیبان‌گیری همین پوشه را کپی کن:`, `Books, translations, cards and settings are kept here. To back up, copy this folder:`)}</p>
     <code class="url" dir="ltr">${esc(d.data_dir)}</code>
-    <h3 style="margin-top:10px">آوردن داده‌های نسخه‌ی قبلی</h3>
-    <p class="small muted">اگر قبلاً ورق را از فایل زیپ اجرا می‌کردی، مسیر پوشه‌ی آن (یا پوشه‌ی data داخلش) را بده تا کتاب‌ها و همه‌چیز به این نسخه بیاید. داده‌های فعلی جایگزین می‌شوند.</p>
-    <div class="r2" style="grid-template-columns:minmax(0,1fr) auto"><input id="imp-path" class="ltr" placeholder="C:\\Users\\Ali\\Downloads\\varagh"><button class="btn" id="imp-go">آوردن داده‌ها</button></div>`;
+    <h3 style="margin-top:10px">${tr(`آوردن داده‌های نسخه‌ی قبلی`, `Import data from a previous version`)}</h3>
+    <p class="small muted">${tr(`اگر قبلاً ورق را از فایل زیپ اجرا می‌کردی، مسیر پوشه‌ی آن (یا پوشه‌ی data داخلش) را بده تا کتاب‌ها و همه‌چیز به این نسخه بیاید. داده‌های فعلی جایگزین می‌شوند.`, `If you used to run Varagh from a zip file, enter that folder's path (or the data folder inside it) to bring your books and everything else into this version. Current data will be replaced.`)}</p>
+    <div class="r2" style="grid-template-columns:minmax(0,1fr) auto"><input id="imp-path" class="ltr" placeholder="C:\\Users\\Ali\\Downloads\\varagh"><button class="btn" id="imp-go">${tr("آوردن داده‌ها", "Import data")}</button></div>`;
   document.getElementById("datacard")?.remove();
   el.after(box);
   $("#imp-go").onclick = async e => {
     const b = e.currentTarget;
-    if (b.dataset.sure !== "1") { b.dataset.sure = "1"; b.textContent = "داده‌های فعلی جایگزین می‌شوند. مطمئنی؟"; return; }
-    try { await api("/api/import-data", { method: "POST", body: { path: $("#imp-path").value } }); toast("داده‌ها آمدند"); location.hash = "#/"; }
-    catch (err) { toast(err.message, true); b.dataset.sure = ""; b.textContent = "آوردن داده‌ها"; }
+    if (b.dataset.sure !== "1") { b.dataset.sure = "1"; b.textContent = tr("داده‌های فعلی جایگزین می‌شوند. مطمئنی؟", "Current data will be replaced. Sure?"); return; }
+    try { await api("/api/import-data", { method: "POST", body: { path: $("#imp-path").value } }); toast(tr("داده‌ها آمدند", "Data imported")); location.hash = "#/"; }
+    catch (err) { toast(err.message, true); b.dataset.sure = ""; b.textContent = tr("آوردن داده‌ها", "Import data"); }
   };
   $("#lan").onchange = async e => { await api("/api/server", { method: "PUT", body: { lan: e.target.checked } }); phoneCard(); };
-  if ($("#tok")) $("#tok").onclick = async () => { await api("/api/server/token", { method: "POST" }); toast("کد ورود تازه ساخته شد"); phoneCard(); };
+  if ($("#tok")) $("#tok").onclick = async () => { await api("/api/server/token", { method: "POST" }); toast(tr("کد ورود تازه ساخته شد", "New login code created")); phoneCard(); };
 }
 
 /* ---------------------------------------------------------------- compare */
@@ -2076,32 +2081,32 @@ async function Compare() {
   const ready = books.filter(b => b.status === "ready");
   const defaults = [s.tasks.translate_para, s.tasks.better, { provider: "ollama", model: "" }];
   view.innerHTML = `<div class="pagewrap-main">
-    <div class="head"><div><h1>مقایسه‌ی مدل‌ها</h1>
-      <p>چند پاراگراف از کتاب خودت را با چند مدل ترجمه کن و کنار هم ببین. مصرف OpenAI در این آزمون هم حساب می‌شود.</p></div></div>
+    <div class="head"><div><h1>${tr(`مقایسه‌ی مدل‌ها`, `Compare models`)}</h1>
+      <p>${tr(`چند پاراگراف از کتاب خودت را با چند مدل ترجمه کن و کنار هم ببین. مصرف OpenAI در این آزمون هم حساب می‌شود.`, `Translate a few paragraphs from your own book with several models and compare them side by side. OpenAI usage in this test counts too.`)}</p></div></div>
     <datalist id="dl-ollama"></datalist><datalist id="dl-openai"></datalist><datalist id="dl-cli2api"></datalist>
     ${ready.length ? `<div class="card" style="display:flex;flex-direction:column;gap:14px;max-width:900px">
-      <div class="r2"><div class="field"><label for="c-book">کتاب</label><select id="c-book">${ready.map(b => `<option value="${b.id}">${esc(b.title)}</option>`).join("")}</select></div>
-        <div class="field"><label for="c-page">صفحه</label><input id="c-page" type="number" min="1" value="${ready[0].last_page || 1}"></div></div>
+      <div class="r2"><div class="field"><label for="c-book">${tr("کتاب", "Book")}</label><select id="c-book">${ready.map(b => `<option value="${b.id}">${esc(b.title)}</option>`).join("")}</select></div>
+        <div class="field"><label for="c-page">${tr("صفحه", "Page")}</label><input id="c-page" type="number" min="1" value="${ready[0].last_page || 1}"></div></div>
       ${defaults.map((t, i) => `<div class="target">
-        <select data-prov aria-label="ارائه‌دهنده ${i + 1}"><option value="cli2api" ${t.provider === "cli2api" ? "selected" : ""}>CLI2API</option><option value="ollama" ${t.provider === "ollama" ? "selected" : ""}>Ollama</option><option value="openai" ${t.provider === "openai" ? "selected" : ""}>OpenAI</option></select>
-        <input data-model class="ltr" list="dl-${t.provider}" value="${esc(t.model)}" placeholder="نام مدل (خالی = نادیده)" aria-label="مدل ${i + 1}"></div>`).join("")}
-      <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap"><button class="btn go" id="run">${ICON.play} اجرای مقایسه</button><span class="small muted" id="c-msg"></span></div>
-    </div><div class="cmp-grid" id="out"></div>` : `<div class="card">اول یک کتاب اضافه کن.</div>`}</div>`;
+        <select data-prov aria-label="${tr(`ارائه‌دهنده ${i + 1}`, `Provider ${i + 1}`)}"><option value="cli2api" ${t.provider === "cli2api" ? "selected" : ""}>CLI2API</option><option value="ollama" ${t.provider === "ollama" ? "selected" : ""}>Ollama</option><option value="openai" ${t.provider === "openai" ? "selected" : ""}>OpenAI</option></select>
+        <input data-model class="ltr" list="dl-${t.provider}" value="${esc(t.model)}" placeholder="${tr(`نام مدل (خالی = نادیده)`, `Model name (empty = skip)`)}" aria-label="${tr(`مدل ${i + 1}`, `Model ${i + 1}`)}"></div>`).join("")}
+      <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap"><button class="btn go" id="run">${ICON.play} ${tr("اجرای مقایسه", "Run comparison")}</button><span class="small muted" id="c-msg"></span></div>
+    </div><div class="cmp-grid" id="out"></div>` : `<div class="card">${tr(`اول یک کتاب اضافه کن.`, `Add a book first.`)}</div>`}</div>`;
   if (!ready.length) return;
   fetchModels("cli2api"); fetchModels("ollama"); if (s.openai.has_key) fetchModels("openai");
   $$(".target").forEach(r => { const sel = $("[data-prov]", r), inp = $("[data-model]", r); sel.onchange = () => { inp.setAttribute("list", "dl-" + sel.value); inp.value = ""; }; });
   $("#run").onclick = async () => {
     const targets = $$(".target").map(r => ({ provider: $("[data-prov]", r).value, model: $("[data-model]", r).value.trim() })).filter(t => t.model);
-    if (!targets.length) return toast("حداقل یک مدل وارد کن", true);
-    $("#run").disabled = true; $("#c-msg").textContent = "در حال ترجمه… مدل‌های محلی ممکن است کمی طول بکشند.";
+    if (!targets.length) return toast(tr("حداقل یک مدل وارد کن", "Enter at least one model"), true);
+    $("#run").disabled = true; $("#c-msg").textContent = tr("در حال ترجمه… مدل‌های محلی ممکن است کمی طول بکشند.", "Translating… local models may take a while.");
     $("#out").innerHTML = "";
     try {
       const d = await api("/api/compare", { method: "POST", body: { book_id: +$("#c-book").value, page: +$("#c-page").value, targets } });
-      $("#out").innerHTML = `<div class="cmp-col src"><div class="h"><b>متن اصلی</b></div>${d.source.map(t => `<p>${esc(t)}</p>`).join("")}</div>` +
+      $("#out").innerHTML = `<div class="cmp-col src"><div class="h"><b>${tr("متن اصلی", "Original")}</b></div>${d.source.map(t => `<p>${esc(t)}</p>`).join("")}</div>` +
         d.results.map(r => `<div class="cmp-col"><div class="h">${providerPill(r.provider, r.model)}
-          <span class="small muted">${fa(r.seconds)} ثانیه · ${fa(r.in_tok)} ورودی · ${fa(r.out_tok)} خروجی</span></div>
+          <span class="small muted">${tr(`${fa(r.seconds)} ثانیه · ${fa(r.in_tok)} ورودی · ${fa(r.out_tok)} خروجی`, `${fa(r.seconds)} s · ${fa(r.in_tok)} in · ${fa(r.out_tok)} out`)}</span></div>
           ${r.error ? `<div class="error-box">${esc(r.error)}</div>` : r.items.map(t => `<p>${esc(t)}</p>`).join("")}</div>`).join("");
-      $("#c-msg").textContent = d.source.length ? "" : "این صفحه متنی برای مقایسه ندارد؛ صفحه‌ی دیگری انتخاب کن.";
+      $("#c-msg").textContent = d.source.length ? "" : tr("این صفحه متنی برای مقایسه ندارد؛ صفحه‌ی دیگری انتخاب کن.", "This page has no text to compare; pick another page.");
     } catch (e) { toast(e.message, true); $("#c-msg").textContent = ""; }
     $("#run").disabled = false;
   };

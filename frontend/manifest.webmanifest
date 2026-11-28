@@ -1,11 +1,11 @@
 {
-  "name": "ورق",
-  "short_name": "ورق",
-  "description": "کتاب‌خوان دوزبانه برای خواندن، فهمیدن و به خاطر سپردن",
+  "name": "Varagh",
+  "short_name": "Varagh",
+  "description": "A bilingual book reader for reading, understanding and remembering",
   "start_url": "/",
   "display": "standalone",
-  "dir": "rtl",
-  "lang": "fa",
+  "dir": "ltr",
+  "lang": "en",
   "background_color": "#0E1621",
   "theme_color": "#0E1621",
   "icons": [
