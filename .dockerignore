@@ -1,0 +1,17 @@
+.git
+.venv
+venv
+data
+docs
+windows
+desktop
+**/__pycache__
+**/*.pyc
+.pytest_cache
+.claude
+Dockerfile
+docker-compose.yml
+.dockerignore
+run.bat
+run.sh
+*.md

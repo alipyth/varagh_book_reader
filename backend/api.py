@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import io
 import json
+import os
 import secrets
 import socket
 import re
@@ -39,6 +40,9 @@ def _startup():
 
 
 LOCAL = ("127.0.0.1", "::1", "localhost")
+# In Docker, browser requests arrive from the bridge gateway, not 127.0.0.1. The image sets this so the
+# published port (bound to the host's localhost in docker-compose.yml) behaves like a local install.
+TRUST_ALL = os.environ.get("VARAGH_TRUST_ALL", "").lower() in ("1", "true", "yes")
 LOCKED_PAGE = """<!doctype html><html lang="fa" dir="rtl"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>ورق</title><body style="font-family:Tahoma,sans-serif;background:#0E1621;color:#E3E9EF;display:flex;min-height:100vh;align-items:center;justify-content:center;margin:0;padding:24px;text-align:center">
 <div><h2>ورق</h2><p>برای باز کردن ورق روی این دستگاه، کد QR صفحه‌ی تنظیمات را روی لپ‌تاپ اسکن کن.</p></div></body></html>"""
@@ -48,7 +52,7 @@ LOCKED_PAGE = """<!doctype html><html lang="fa" dir="rtl"><meta charset="utf-8">
 async def lan_guard(request: Request, call_next):
     """Requests from the laptop itself pass; other devices on the Wi-Fi need the access link once."""
     host = request.client.host if request.client else ""
-    if host in LOCAL or host.startswith("127."):
+    if TRUST_ALL or host in LOCAL or host.startswith("127."):
         return await call_next(request)
     tok = load_settings()["server"].get("token") or ""
     t = request.query_params.get("t")
@@ -845,7 +849,7 @@ class ImportReq(BaseModel):
 def import_data(r: ImportReq, request: Request):
     """Copy the data folder of an older (zip) installation into the current data folder."""
     host = request.client.host if request.client else ""
-    if host not in LOCAL and not host.startswith("127."):
+    if not TRUST_ALL and host not in LOCAL and not host.startswith("127."):
         raise HTTPException(403, "فقط از روی خود لپ‌تاپ")
     src = Path(r.path.strip().strip('"'))
     if src.is_file():

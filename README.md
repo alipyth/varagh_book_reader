@@ -72,6 +72,12 @@ chmod +x run.sh
 
 On first run, Varagh creates `.venv`, installs dependencies, **automatically launches the bundled `CLI_to_API` gateway** on `http://127.0.0.1:8787`, and opens the reader in your browser at **`http://127.0.0.1:8765`**.
 
+### Docker
+```bash
+docker compose up -d
+```
+Then open **`http://127.0.0.1:8765`**. Your data lives in the `varagh-data` volume. Ollama on the host is reached at `host.docker.internal:11434`. AI CLIs installed on your host (`agy`, `claude`, `codex`) aren't available inside the container, so either use Ollama/OpenAI, or run `CLI_to_API` on the host and set `VARAGH_CLI2API_URL: http://host.docker.internal:8787` in `docker-compose.yml`. The port is published on localhost only; phone access over Wi-Fi isn't supported in the container.
+
 ---
 
 ## Key Features

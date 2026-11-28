@@ -1,0 +1,22 @@
+services:
+  varagh:
+    build: .
+    image: varagh:latest
+    container_name: varagh
+    restart: unless-stopped
+    ports:
+      # Bound to localhost only: the container trusts every request (VARAGH_TRUST_ALL=1),
+      # so don't publish it on 0.0.0.0 unless you put your own auth in front of it.
+      - "127.0.0.1:8765:8765"
+    volumes:
+      - varagh-data:/data          # books, translations, cards, settings
+    environment:
+      # Ollama running on the host machine (default). Change if it runs elsewhere.
+      VARAGH_OLLAMA_URL: http://host.docker.internal:11434
+      # CLI2API running on the host (the bundled one can't reach CLIs installed on the host):
+      # VARAGH_CLI2API_URL: http://host.docker.internal:8787
+    extra_hosts:
+      - "host.docker.internal:host-gateway"   # makes host.docker.internal work on Linux too
+
+volumes:
+  varagh-data:
