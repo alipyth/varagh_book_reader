@@ -48,7 +48,7 @@ DEFAULTS: dict = {
         "timeout": 180,
     },
     "ollama": {
-        "base_url": "http://127.0.0.1:11434",
+        "base_url": os.environ.get("VARAGH_OLLAMA_URL", "http://127.0.0.1:11434"),
         "num_ctx": 4096,
         "num_ctx_page": 8192,
         "keep_alive": "30m",
@@ -58,7 +58,7 @@ DEFAULTS: dict = {
         "timeout": 900,
     },
     "cli2api": {
-        "base_url": "http://127.0.0.1:8787",
+        "base_url": os.environ.get("VARAGH_CLI2API_URL", "http://127.0.0.1:8787"),
         "api_key": "",
         "default_cli": "agy",
         "effort": "low",

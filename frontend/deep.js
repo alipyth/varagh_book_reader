@@ -59,10 +59,10 @@ window.mountInteractivePlot = function mountInteractivePlot(el, spec) {
   const colors = ["#2159A0", "#E3A92B", "#2D7A57", "#B23A5B", "#6A4BA6"];
 
   el.innerHTML = `<div class="iplot">
-    <div class="iplot-head"><b>📊 ${esc(spec.title || "نمودار تعاملی")}</b>
+    <div class="iplot-head"><b>📊 ${esc(spec.title || tr("نمودار تعاملی", "Interactive chart"))}</b>
       <div class="iplot-leg">${spec.curves.map((c, i) => `<span><i style="background:${c.color || colors[i % colors.length]}"></i>${esc(c.label || c.expr)}</span>`).join("")}</div>
     </div>
-    <svg class="iplot-svg" viewBox="0 0 520 250" role="img" aria-label="نمودار تعاملی"></svg>
+    <svg class="iplot-svg" viewBox="0 0 520 250" role="img" aria-label="${tr(`نمودار تعاملی`, `Interactive chart`)}"></svg>
     ${params.length ? `<div class="iplot-sliders">${params.map((p, i) => `
       <label class="islider">
         <span class="isl-top"><span>${esc(p.label || p.name)}</span><b dir="ltr" data-val="${i}">${state[i]}</b></span>
@@ -250,25 +250,25 @@ window.Deep = (() => {
     m.id = "addmodal"; m.className = "modal-back";
     m.innerHTML = `<div class="modal" role="dialog" aria-modal="true" style="max-width:560px">
       <div style="display:flex;justify-content:space-between;align-items:center">
-        <h2>افزودن مقاله، لینک یا متن</h2>
-        <button class="btn icon ghost" id="am-x" aria-label="بستن">${ICON.close}</button>
+        <h2>${tr(`افزودن مقاله، لینک یا متن`, `Add an article, link or text`)}</h2>
+        <button class="btn icon ghost" id="am-x" aria-label="${tr("بستن", "Close")}">${ICON.close}</button>
       </div>
       <div class="seg" id="am-tabs" style="align-self:flex-start">
-        <button data-v="url" class="on">از لینک وب / ArXiv</button>
-        <button data-v="text">چسباندن متن / Markdown</button>
+        <button data-v="url" class="on">${tr(`از لینک وب / ArXiv`, `From a web link / ArXiv`)}</button>
+        <button data-v="text">${tr(`چسباندن متن / Markdown`, `Paste text / Markdown`)}</button>
       </div>
       <div id="am-url-box">
-        <div class="field"><label for="am-url">آدرس مقاله یا PDF آنلاین (مثل ArXiv یا وبلاگ)</label>
-          <input id="am-url" type="url" class="ltr" placeholder="https://arxiv.org/abs/... یا هر لینک مقاله"></div>
+        <div class="field"><label for="am-url">${tr(`آدرس مقاله یا PDF آنلاین (مثل ArXiv یا وبلاگ)`, `Article or online PDF URL (ArXiv, a blog, …)`)}</label>
+          <input id="am-url" type="url" class="ltr" placeholder="${tr(`https://arxiv.org/abs/... یا هر لینک مقاله`, `https://arxiv.org/abs/... or any article link`)}"></div>
       </div>
       <div id="am-txt-box" hidden style="display:flex;flex-direction:column;gap:8px">
-        <div class="field"><label for="am-title">عنوان</label><input id="am-title" type="text" placeholder="عنوان یادداشت یا مقاله"></div>
-        <div class="field"><label for="am-text">متن (انگلیسی یا فارسی، Markdown پشتیبانی می‌شود)</label>
-          <textarea id="am-text" rows="7" placeholder="متن را اینجا بچسبان…"></textarea></div>
+        <div class="field"><label for="am-title">${tr("عنوان", "Title")}</label><input id="am-title" type="text" placeholder="${tr(`عنوان یادداشت یا مقاله`, `Note or article title`)}"></div>
+        <div class="field"><label for="am-text">${tr(`متن (انگلیسی یا فارسی، Markdown پشتیبانی می‌شود)`, `Text (English or Persian; Markdown supported)`)}</label>
+          <textarea id="am-text" rows="7" placeholder="${tr(`متن را اینجا بچسبان…`, `Paste the text here…`)}"></textarea></div>
       </div>
       <div class="row-acts" style="justify-content:flex-end">
-        <button class="btn ghost" id="am-cancel">انصراف</button>
-        <button class="btn primary" id="am-go">افزودن به کتابخانه</button>
+        <button class="btn ghost" id="am-cancel">${tr(`انصراف`, `Cancel`)}</button>
+        <button class="btn primary" id="am-go">${tr("افزودن به کتابخانه", "Add to library")}</button>
       </div></div>`;
     document.body.appendChild(m);
     let tab = "url";
@@ -282,15 +282,15 @@ window.Deep = (() => {
       $("#am-txt-box").hidden = tab !== "text";
     });
     $("#am-go").onclick = async () => {
-      const btn = $("#am-go"); btn.disabled = true; btn.textContent = "در حال افزودن…";
+      const btn = $("#am-go"); btn.disabled = true; btn.textContent = tr("در حال افزودن…", "Adding…");
       try {
         if (tab === "url") {
           await api("/api/books/from-url", { method: "POST", body: { url: $("#am-url").value.trim() } });
         } else {
           await api("/api/books/from-text", { method: "POST", body: { title: $("#am-title").value.trim(), text: $("#am-text").value } });
         }
-        toast("به کتابخانه اضافه شد"); close(); onDone && onDone();
-      } catch (e) { toast(e.message, true); btn.disabled = false; btn.textContent = "افزودن به کتابخانه"; }
+        toast(tr("به کتابخانه اضافه شد", "Added to library")); close(); onDone && onDone();
+      } catch (e) { toast(e.message, true); btn.disabled = false; btn.textContent = tr("افزودن به کتابخانه", "Add to library"); }
     };
     $("#am-url").focus();
   }
@@ -301,42 +301,42 @@ window.Deep = (() => {
     m.id = "cgenmodal"; m.className = "modal-back";
     m.innerHTML = `<div class="modal" role="dialog" aria-modal="true" style="max-width:620px">
       <div style="display:flex;justify-content:space-between;align-items:center">
-        <h2>ساخت کارت‌های یادآوری مفهومی (FSRS)</h2>
-        <button class="btn icon ghost" id="cg-x" aria-label="بستن">${ICON.close}</button>
+        <h2>${tr(`ساخت کارت‌های یادآوری مفهومی (FSRS)`, `Build concept recall cards (FSRS)`)}</h2>
+        <button class="btn icon ghost" id="cg-x" aria-label="${tr("بستن", "Close")}">${ICON.close}</button>
       </div>
-      <div id="cg-body"><span class="pill busy">در حال طراحی ۳ کارت عمیق (چرا/چگونه، جای‌خالی Cloze و سناریو)…</span></div>
+      <div id="cg-body"><span class="pill busy">${tr(`در حال طراحی ۳ کارت عمیق (چرا/چگونه، جای‌خالی Cloze و سناریو)…`, `Designing 3 deep cards (why/how, cloze and scenario)…`)}</span></div>
     </div>`;
     document.body.appendChild(m);
     const close = () => m.remove();
     $("#cg-x").onclick = close;
     m.addEventListener("click", e => { if (e.target === m) close(); });
-    const TYPE_FA = { causal: "علت و مکانیزم", cloze: "جای‌خالی (Cloze)", scenario: "سناریوی کاربردی" };
+    const TYPE_FA = { causal: tr("علت و مکانیزم", "Cause & mechanism"), cloze: tr("جای‌خالی (Cloze)", "Cloze"), scenario: tr("سناریوی کاربردی", "Applied scenario") };
     try {
       const d = await api(`/api/paragraphs/${paraId}/cards/generate`, { method: "POST" });
       $("#cg-body").innerHTML = `<div class="cg-list">${d.cards.map((c, i) => `
         <div class="cg-item" data-i="${i}">
           <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
             <span class="pill cli2api">${TYPE_FA[c.type] || c.type}</span>
-            <button class="btn sm primary" data-save="${i}">ذخیره در کارت‌ها</button>
+            <button class="btn sm primary" data-save="${i}">${tr(`ذخیره در کارت‌ها`, `Save to cards`)}</button>
           </div>
           <div class="cg-q">${esc(c.front)}</div>
           <div class="cg-a small muted">${esc(c.back)}</div>
         </div>`).join("")}</div>
         <div class="row-acts" style="justify-content:space-between;margin-top:10px">
           <span class="small muted">${providerPill(d.provider, d.model)}</span>
-          <button class="btn primary" id="cg-all">ذخیره‌ی هر ${fa(d.cards.length)} کارت</button>
+          <button class="btn primary" id="cg-all">${tr(`ذخیره‌ی هر ${fa(d.cards.length)} کارت`, `Save all ${fa(d.cards.length)} cards`)}</button>
         </div>`;
       const saveOne = async (idx, btn) => {
         const c = d.cards[idx];
         const r = await api("/api/cards", { method: "POST", body: { book_id: d.book_id, page: d.page, front: c.front, back: c.back, context: "", card_type: c.type } });
-        if (btn) { btn.disabled = true; btn.textContent = r.duplicate ? "تکراری" : "ذخیره شد ✓"; }
+        if (btn) { btn.disabled = true; btn.textContent = r.duplicate ? tr("تکراری", "Duplicate") : tr("ذخیره شد ✓", "Saved ✓"); }
         onAdded && onAdded();
       };
       $$("[data-save]", m).forEach(b => b.onclick = () => saveOne(+b.dataset.save, b).catch(e => toast(e.message, true)));
       $("#cg-all").onclick = async () => {
         $("#cg-all").disabled = true;
         for (let i = 0; i < d.cards.length; i++) await saveOne(i, $(`[data-save="${i}"]`, m));
-        toast("همه‌ی کارت‌ها به FSRS اضافه شدند"); close();
+        toast(tr("همه‌ی کارت‌ها به FSRS اضافه شدند", "All cards added to FSRS")); close();
       };
     } catch (e) {
       $("#cg-body").innerHTML = `<div class="error-box">${esc(e.message)}</div>`;
@@ -348,25 +348,25 @@ window.Deep = (() => {
     const { bookId, getPage, focusPara, clearFocusPara, refreshUsage } = ctx;
     const page = getPage();
     pane.innerHTML = `<div class="tutor-wrap">
-      <div class="tab-intro"><b>گفت‌وگو با متن صفحه</b> — فقط تا صفحه‌ی ${fa(page)} را می‌بیند (بدون لو دادن ادامه). سؤالت را بپرس یا دکمه‌ی سنجش سقراطی را بزن.</div>
+      <div class="tab-intro">${tr(`<b>گفت‌وگو با متن صفحه</b> — فقط تا صفحه‌ی ${fa(page)} را می‌بیند (بدون لو دادن ادامه). سؤالت را بپرس یا دکمه‌ی سنجش سقراطی را بزن.`, `<b>Chat with this page</b> — it only sees up to page ${fa(page)} (no spoilers). Ask a question or try the Socratic check.`)}</div>
       <div class="tutor-chips">
-        <button class="btn sm primary" data-tm="practice">🧪 توضیح ساده + نمودار + تمرین</button>
-        <button class="btn sm" data-tm="grill">🎯 مرا سقراطی بسنج</button>
-        <button class="btn sm ghost" data-tm="connect">🔗 ربط به قبل</button>
-        <button class="btn sm ghost danger" id="t-clear" title="پاک کردن گفتگو">پاک</button>
+        <button class="btn sm primary" data-tm="practice">${tr(`🧪 توضیح ساده + نمودار + تمرین`, `🧪 Simple explanation + chart + practice`)}</button>
+        <button class="btn sm" data-tm="grill">${tr(`🎯 مرا سقراطی بسنج`, `🎯 Quiz me Socratically`)}</button>
+        <button class="btn sm ghost" data-tm="connect">${tr(`🔗 ربط به قبل`, `🔗 Connect to earlier pages`)}</button>
+        <button class="btn sm ghost danger" id="t-clear" title="${tr(`پاک کردن گفتگو`, `Clear conversation`)}">${tr("پاک", "Clear")}</button>
       </div>
-      ${focusPara ? `<div class="tutor-focus"><span>پاراگراف انتخاب‌شده:</span><p class="small" dir="ltr">${esc(focusPara.text.slice(0, 140))}…</p><button class="btn sm ghost" id="t-unfocus" aria-label="لغو انتخاب">×</button></div>` : ""}
-      <div class="tutor-msgs" id="t-msgs"><span class="small muted">در حال بارگذاری…</span></div>
+      ${focusPara ? `<div class="tutor-focus"><span>${tr(`پاراگراف انتخاب‌شده:`, `Selected paragraph:`)}</span><p class="small" dir="ltr">${esc(focusPara.text.slice(0, 140))}…</p><button class="btn sm ghost" id="t-unfocus" aria-label="${tr(`لغو انتخاب`, `Clear selection`)}">×</button></div>` : ""}
+      <div class="tutor-msgs" id="t-msgs"><span class="small muted">${tr(`در حال بارگذاری…`, `Loading…`)}</span></div>
       <form class="tutor-form" id="t-form">
-        <textarea id="t-in" rows="2" placeholder="سؤالت را از این صفحه بپرس یا استدلال نویسنده را به چالش بکش…"></textarea>
-        <button class="btn primary sm" id="t-send">ارسال پیام</button>
+        <textarea id="t-in" rows="2" placeholder="${tr(`سؤالت را از این صفحه بپرس یا استدلال نویسنده را به چالش بکش…`, `Ask about this page or challenge the author's argument…`)}"></textarea>
+        <button class="btn primary sm" id="t-send">${tr(`ارسال پیام`, `Send`)}</button>
       </form>
     </div>`;
     if ($("#t-unfocus")) $("#t-unfocus").onclick = () => { clearFocusPara(); renderTutorTab(pane, ctx); };
     const msgsEl = $("#t-msgs");
     const draw = list => {
       if (!list.length) {
-        msgsEl.innerHTML = `<p class="small muted">گفت‌وگوی زنده با متن تا صفحه‌ی ${fa(page)} (بدون لو دادن ادامه). دکمه‌ی «مرا سقراطی بسنج» را بزن یا سؤالت را بنویس.</p>`;
+        msgsEl.innerHTML = `<p class="small muted">${tr(`گفت‌وگوی زنده با متن تا صفحه‌ی ${fa(page)} (بدون لو دادن ادامه). دکمه‌ی «مرا سقراطی بسنج» را بزن یا سؤالت را بنویس.`, `Live chat with the text up to page ${fa(page)} (no spoilers). Press “Quiz me Socratically” or type your question.`)}</p>`;
         return;
       }
       msgsEl.innerHTML = list.map(m => `<div class="tmsg ${m.role}"><div class="tbub">${m.role === "assistant" ? renderMd(m.content) : esc(m.content)}</div></div>`).join("");
@@ -380,7 +380,7 @@ window.Deep = (() => {
     async function send(text, mode = "ask") {
       const inp = $("#t-in"), btn = $("#t-send");
       btn.disabled = true;
-      const shownUser = text || (mode === "grill" ? "🎯 مرا با سؤال‌های سقراطی بسنج" : "🔗 ربط این صفحه به صفحه‌های قبل");
+      const shownUser = text || (mode === "grill" ? tr("🎯 مرا با سؤال‌های سقراطی بسنج", "🎯 Quiz me with Socratic questions") : tr("🔗 ربط این صفحه به صفحه‌های قبل", "🔗 Connect this page to earlier pages"));
       hist.push({ role: "user", content: shownUser });
       const liveMsg = { role: "assistant", content: "" };
       hist.push(liveMsg);
@@ -394,7 +394,7 @@ window.Deep = (() => {
         });
         if (!resp.ok) {
           let d = null; try { d = await resp.json(); } catch {}
-          throw new Error((d && d.detail) || `خطای ${resp.status}`);
+          throw new Error((d && d.detail) || tr(`خطای ${resp.status}`, `Error ${resp.status}`));
         }
         const reader = resp.body.getReader(), dec = new TextDecoder();
         let full = "";
@@ -426,42 +426,42 @@ window.Deep = (() => {
     const { bookId, getPage, refreshUsage } = ctx;
     const page = getPage();
     pane.innerHTML = `<div class="brain-wrap">
-      <div class="tab-intro"><b>ارتباط بین کتاب‌ها و Obsidian</b> — ایده‌های این صفحه را به یادداشت‌ها و کتاب‌های قبلی‌ات وصل می‌کند و کل یادداشت‌های کتاب را برای Obsidian خروجی می‌گیرد.</div>
-      <h4>خروجی Markdown برای Obsidian</h4>
+      <div class="tab-intro">${tr(`<b>ارتباط بین کتاب‌ها و Obsidian</b> — ایده‌های این صفحه را به یادداشت‌ها و کتاب‌های قبلی‌ات وصل می‌کند و کل یادداشت‌های کتاب را برای Obsidian خروجی می‌گیرد.`, `<b>Cross-book links & Obsidian</b> — connects this page's ideas to your notes and earlier books, and exports all of this book's notes for Obsidian.`)}</div>
+      <h4>${tr(`خروجی Markdown برای Obsidian`, `Markdown export for Obsidian`)}</h4>
       <div class="row-acts">
-        <a class="btn sm primary" href="/api/books/${bookId}/export-obsidian">دانلود فایل .md</a>
-        <button class="btn sm" id="ob-sync">ذخیره در پوشه‌ی Vault</button>
+        <a class="btn sm primary" href="/api/books/${bookId}/export-obsidian">${tr(`دانلود فایل .md`, `Download .md file`)}</a>
+        <button class="btn sm" id="ob-sync">${tr(`ذخیره در پوشه‌ی Vault`, `Save to vault folder`)}</button>
       </div>
       <hr class="sep">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
-        <h4>ایده‌های مرتبط در کتاب‌های دیگر</h4>
-        <button class="btn sm" id="cb-synth">ترکیب با مدل</button>
+        <h4>${tr(`ایده‌های مرتبط در کتاب‌های دیگر`, `Related ideas in other books`)}</h4>
+        <button class="btn sm" id="cb-synth">${tr("ترکیب با مدل", "Synthesize with model")}</button>
       </div>
       <div id="cb-synth-out"></div>
-      <div id="cb-list"><span class="small muted">در حال جست‌وجو در کتابخانه…</span></div>
+      <div id="cb-list"><span class="small muted">${tr(`در حال جست‌وجو در کتابخانه…`, `Searching your library…`)}</span></div>
     </div>`;
     $("#ob-sync").onclick = async () => {
-      try { const r = await api(`/api/books/${bookId}/sync-obsidian`, { method: "POST" }); toast(`در Obsidian ذخیره شد: ${r.filename}`); }
+      try { const r = await api(`/api/books/${bookId}/sync-obsidian`, { method: "POST" }); toast(tr(`در Obsidian ذخیره شد: ${r.filename}`, `Saved to Obsidian: ${r.filename}`)); }
       catch (e) { toast(e.message, true); }
     };
     $("#cb-synth").onclick = async () => {
-      const b = $("#cb-synth"); b.disabled = true; b.textContent = "در حال ترکیب…";
+      const b = $("#cb-synth"); b.disabled = true; b.textContent = tr("در حال ترکیب…", "Synthesizing…");
       try {
         const r = await api(`/api/books/${bookId}/pages/${page}/connections/synthesize`, { method: "POST" });
         $("#cb-synth-out").innerHTML = `<div class="deep-box">${renderMd(r.synthesis)}${providerPill(r.provider, r.model)}</div>`;
         refreshUsage && refreshUsage();
       } catch (e) { toast(e.message, true); }
-      b.disabled = false; b.textContent = "ترکیب با مدل";
+      b.disabled = false; b.textContent = tr("ترکیب با مدل", "Synthesize with model");
     };
-    const KIND_FA = { journal: "دفترچه", card: "کارت", highlight: "هایلایت", passage: "متن" };
+    const KIND_FA = { journal: tr("دفترچه", "Journal"), card: tr("کارت", "Card"), highlight: tr("هایلایت", "Highlight"), passage: tr("متن", "Passage") };
     try {
       const d = await api(`/api/books/${bookId}/pages/${page}/connections`);
       if (!d.matches.length) {
-        $("#cb-list").innerHTML = `<p class="small muted">هنوز ارتباطی با کتاب‌های دیگر برای این صفحه پیدا نشد.</p>`;
+        $("#cb-list").innerHTML = `<p class="small muted">${tr(`هنوز ارتباطی با کتاب‌های دیگر برای این صفحه پیدا نشد.`, `No links to other books found for this page yet.`)}</p>`;
       } else {
         $("#cb-list").innerHTML = d.matches.map(m => `
           <a class="cb-item" href="#/read/${m.book_id}/${m.page}">
-            <div class="cb-head"><b dir="auto">${esc(m.book)}</b><span>ص ${fa(m.page)} · ${KIND_FA[m.kind] || m.kind}</span></div>
+            <div class="cb-head"><b dir="auto">${esc(m.book)}</b><span>${tr("ص", "p.")} ${fa(m.page)} · ${KIND_FA[m.kind] || m.kind}</span></div>
             <p class="small">${esc(m.snippet)}</p>
             ${m.shared?.length ? `<div class="cb-kw">${m.shared.map(w => `<span>${esc(w)}</span>`).join("")}</div>` : ""}
           </a>`).join("");
@@ -474,18 +474,18 @@ window.Deep = (() => {
     const { bookId, getPage, closeOverlay, goPage, refreshUsage, openOtherOverlay } = ctx;
     let tab = LS.get("deepTab", "xray");
     const renderShell = () => {
-      ov.innerHTML = `<div class="ov-head"><b>🧠 مرکز یادگیری عمیق</b>
+      ov.innerHTML = `<div class="ov-head"><b>${tr(`🧠 مرکز یادگیری عمیق`, `🧠 Deep study`)}</b>
         <div class="seg" id="dp-tabs">
-          <button data-v="xray" class="${tab === "xray" ? "on" : ""}">🩻 پیش‌خوانی فصل</button>
-          <button data-v="feynman" class="${tab === "feynman" ? "on" : ""}">✍️ آزمون فاینمن</button>
-          <button data-v="critique" class="${tab === "critique" ? "on" : ""}">⚖️ نقد کتاب</button>
-          <button data-v="concepts" class="${tab === "concepts" ? "on" : ""}">🕸️ گراف مفاهیم</button>
-          <button data-v="mind">🗺️ نقشه‌ی ذهنی</button>
-          <button data-v="quiz">✅ سؤال‌های فصل</button>
+          <button data-v="xray" class="${tab === "xray" ? "on" : ""}">${tr(`🩻 پیش‌خوانی فصل`, `🩻 Chapter X-ray`)}</button>
+          <button data-v="feynman" class="${tab === "feynman" ? "on" : ""}">${tr(`✍️ آزمون فاینمن`, `✍️ Feynman test`)}</button>
+          <button data-v="critique" class="${tab === "critique" ? "on" : ""}">${tr(`⚖️ نقد کتاب`, `⚖️ Critique`)}</button>
+          <button data-v="concepts" class="${tab === "concepts" ? "on" : ""}">${tr(`🕸️ گراف مفاهیم`, `🕸️ Concept graph`)}</button>
+          <button data-v="mind">${tr(`🗺️ نقشه‌ی ذهنی`, `🗺️ Mind map`)}</button>
+          <button data-v="quiz">${tr(`✅ سؤال‌های فصل`, `✅ Chapter questions`)}</button>
         </div>
         <span class="grow"></span>
-        <button class="btn sm ghost" data-close aria-label="بستن">× بستن (Esc)</button></div>
-        <div class="ov-scroll" id="dp-body"><div class="ov-cta" style="position:static;min-height:40vh"><span class="pill busy">در حال بارگذاری…</span></div></div>`;
+        <button class="btn sm ghost" data-close aria-label="${tr("بستن", "Close")}">${tr("× بستن (Esc)", "× Close (Esc)")}</button></div>
+        <div class="ov-scroll" id="dp-body"><div class="ov-cta" style="position:static;min-height:40vh"><span class="pill busy">${tr(`در حال بارگذاری…`, `Loading…`)}</span></div></div>`;
       $("[data-close]", ov).onclick = closeOverlay;
       $$("#dp-tabs button").forEach(b => b.onclick = () => {
         if (b.dataset.v === "mind" || b.dataset.v === "quiz") {
@@ -509,11 +509,11 @@ window.Deep = (() => {
       const d = await api(`/api/books/${bookId}/xray?page=${page}`);
       if (!d.xray) {
         body.innerHTML = `<div class="ov-cta" style="position:static;min-height:50vh">
-          <b>پیش‌خوانی X-Ray برای «${esc(d.label)}» (ص ${fa(d.start)} تا ${fa(d.end)})</b>
-          <span class="small muted">در ۲۰ ثانیه نقشه‌ی ساختاری فصل را ببین: تز اصلی، ادعاهای کلیدی، سؤال‌ها، و کدام بخش‌ها را عمیق بخوانی و کدام‌ها را سریع رد شوی.</span>
-          <button class="btn go" id="xr-go">🩻 ساخت پیش‌خوانی فصل</button></div>`;
+          <b>${tr(`پیش‌خوانی X-Ray برای «${esc(d.label)}» (ص ${fa(d.start)} تا ${fa(d.end)})`, `X-ray preview of “${esc(trS(d.label))}” (pp. ${fa(d.start)}–${fa(d.end)})`)}</b>
+          <span class="small muted">${tr(`در ۲۰ ثانیه نقشه‌ی ساختاری فصل را ببین: تز اصلی، ادعاهای کلیدی، سؤال‌ها، و کدام بخش‌ها را عمیق بخوانی و کدام‌ها را سریع رد شوی.`, `See the chapter's structure in 20 seconds: the main thesis, key claims, questions, and which parts to read slowly and which to skim.`)}</span>
+          <button class="btn go" id="xr-go">${tr(`🩻 ساخت پیش‌خوانی فصل`, `🩻 Build chapter X-ray`)}</button></div>`;
         $("#xr-go").onclick = async () => {
-          body.innerHTML = `<div class="ov-cta" style="position:static;min-height:50vh"><span class="pill busy">در حال اسکن ساختاری فصل…</span></div>`;
+          body.innerHTML = `<div class="ov-cta" style="position:static;min-height:50vh"><span class="pill busy">${tr(`در حال اسکن ساختاری فصل…`, `Scanning the chapter's structure…`)}</span></div>`;
           try { await api(`/api/books/${bookId}/xray?page=${page}`, { method: "POST" }); refreshUsage(); renderXray(body, page); }
           catch (e) { body.innerHTML = `<div class="error-box" style="margin:20px">${esc(e.message)}</div>`; }
         };
@@ -521,20 +521,20 @@ window.Deep = (() => {
       }
       const x = d.xray;
       body.innerHTML = `<div class="deep-page">
-        <div class="dp-top"><div><span class="eyebrow-s">پیش‌خوانی X-Ray · ص ${fa(d.start)} تا ${fa(d.end)}</span><h2>${esc(d.label)}</h2></div>
-          <div style="display:flex;gap:8px;align-items:center">${providerPill(x.provider, x.model)}<button class="btn sm ghost" id="xr-redo">ساخت دوباره</button></div></div>
-        <div class="deep-hero"><span class="eyebrow-s">تز مرکزی فصل</span><p>${esc(x.thesis)}</p></div>
+        <div class="dp-top"><div><span class="eyebrow-s">${tr(`پیش‌خوانی X-Ray · ص ${fa(d.start)} تا ${fa(d.end)}`, `X-ray preview · pp. ${fa(d.start)}–${fa(d.end)}`)}</span><h2>${esc(trS(d.label))}</h2></div>
+          <div style="display:flex;gap:8px;align-items:center">${providerPill(x.provider, x.model)}<button class="btn sm ghost" id="xr-redo">${tr("ساخت دوباره", "Rebuild")}</button></div></div>
+        <div class="deep-hero"><span class="eyebrow-s">${tr(`تز مرکزی فصل`, `Central thesis`)}</span><p>${esc(x.thesis)}</p></div>
         <div class="dp-grid">
-          <div class="card"><h3>ادعاهای کلیدی</h3><ul>${(x.core_claims || []).map(c => `<li>${esc(c.claim)} ${c.page ? `<button class="linkbtn" data-go="${c.page}">ص ${fa(c.page)}</button>` : ""}</li>`).join("")}</ul></div>
-          <div class="card"><h3>سؤال‌هایی که این فصل جواب می‌دهد</h3><ul>${(x.key_questions || []).map(q => `<li>${esc(q)}</li>`).join("")}</ul></div>
-          <div class="card"><h3>🟡 کجا عمیق مکث کنی</h3><ul>${(x.read_slow || []).map(s => `<li>${esc(s)}</li>`).join("")}</ul></div>
-          <div class="card"><h3>⚪ کجا می‌توانی سریع رد شوی</h3><ul>${(x.can_skim || []).map(s => `<li>${esc(s)}</li>`).join("")}</ul></div>
+          <div class="card"><h3>${tr(`ادعاهای کلیدی`, `Key claims`)}</h3><ul>${(x.core_claims || []).map(c => `<li>${esc(c.claim)} ${c.page ? `<button class="linkbtn" data-go="${c.page}">${tr("ص", "p.")} ${fa(c.page)}</button>` : ""}</li>`).join("")}</ul></div>
+          <div class="card"><h3>${tr(`سؤال‌هایی که این فصل جواب می‌دهد`, `Questions this chapter answers`)}</h3><ul>${(x.key_questions || []).map(q => `<li>${esc(q)}</li>`).join("")}</ul></div>
+          <div class="card"><h3>${tr(`🟡 کجا عمیق مکث کنی`, `🟡 Where to slow down`)}</h3><ul>${(x.read_slow || []).map(s => `<li>${esc(s)}</li>`).join("")}</ul></div>
+          <div class="card"><h3>${tr(`⚪ کجا می‌توانی سریع رد شوی`, `⚪ What you can skim`)}</h3><ul>${(x.can_skim || []).map(s => `<li>${esc(s)}</li>`).join("")}</ul></div>
         </div>
-        ${x.takeaway ? `<div class="deep-box"><b>جمع‌بندی طلایی:</b> ${esc(x.takeaway)}</div>` : ""}
+        ${x.takeaway ? `<div class="deep-box"><b>${tr(`جمع‌بندی طلایی:`, `Key takeaway:`)}</b> ${esc(x.takeaway)}</div>` : ""}
       </div>`;
       $$("[data-go]", body).forEach(b => b.onclick = () => { closeOverlay(); goPage(+b.dataset.go); });
       $("#xr-redo").onclick = async () => {
-        body.innerHTML = `<div class="ov-cta" style="position:static;min-height:50vh"><span class="pill busy">در حال اسکن دوباره…</span></div>`;
+        body.innerHTML = `<div class="ov-cta" style="position:static;min-height:50vh"><span class="pill busy">${tr(`در حال اسکن دوباره…`, `Rescanning…`)}</span></div>`;
         await api(`/api/books/${bookId}/xray?page=${page}`, { method: "POST" }); refreshUsage(); renderXray(body, page);
       };
     }
@@ -542,36 +542,37 @@ window.Deep = (() => {
     async function renderFeynman(body, page) {
       const d = await api(`/api/books/${bookId}/feynman?page=${page}`);
       const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+      const MIC_LABEL = tr("🎤 گفتار به متن (فارسی)", "🎤 Dictate");
       body.innerHTML = `<div class="deep-page">
-        <div class="dp-top"><div><span class="eyebrow-s">تکنیک فاینمن زنده · ص ${fa(d.start)} تا ${fa(d.end)}</span><h2>به زبان خودت تدریس کن</h2></div></div>
+        <div class="dp-top"><div><span class="eyebrow-s">${tr(`تکنیک فاینمن زنده · ص ${fa(d.start)} تا ${fa(d.end)}`, `Live Feynman technique · pp. ${fa(d.start)}–${fa(d.end)}`)}</span><h2>${tr(`به زبان خودت تدریس کن`, `Teach it in your own words`)}</h2></div></div>
         <div class="card" style="display:flex;flex-direction:column;gap:10px">
-          <input id="fn-topic" placeholder="مفهوم یا عنوان بخش (اختیاری، پیش‌فرض: ${esc(d.label)})">
-          <textarea id="fn-exp" rows="5" placeholder="طوری توضیح بده که انگار داری برای یک دوست باهوش که این کتاب را نخوانده تعریف می‌کنی…"></textarea>
+          <input id="fn-topic" placeholder="${tr(`مفهوم یا عنوان بخش (اختیاری، پیش‌فرض: ${esc(d.label)})`, `Concept or section title (optional, default: ${esc(trS(d.label))})`)}">
+          <textarea id="fn-exp" rows="5" placeholder="${tr(`طوری توضیح بده که انگار داری برای یک دوست باهوش که این کتاب را نخوانده تعریف می‌کنی…`, `Explain it as if to a smart friend who hasn't read this book…`)}"></textarea>
           <div class="row-acts" style="justify-content:space-between">
-            ${SR ? `<button class="btn sm ghost" id="fn-mic">🎤 گفتار به متن (فارسی)</button>` : `<span></span>`}
-            <button class="btn go" id="fn-go">بررسی شکاف‌های فهم من</button>
+            ${SR ? `<button class="btn sm ghost" id="fn-mic">${MIC_LABEL}</button>` : `<span></span>`}
+            <button class="btn go" id="fn-go">${tr("بررسی شکاف‌های فهم من", "Find gaps in my understanding")}</button>
           </div>
           <div id="fn-res"></div>
         </div>
-        ${d.items.length ? `<h3>تمرین‌های قبلی این فصل</h3><div class="fn-hist">${d.items.map(it => renderFeynmanCard(it)).join("")}</div>` : ""}
+        ${d.items.length ? `<h3>${tr(`تمرین‌های قبلی این فصل`, `Earlier attempts in this chapter`)}</h3><div class="fn-hist">${d.items.map(it => renderFeynmanCard(it)).join("")}</div>` : ""}
       </div>`;
       if (SR && $("#fn-mic")) {
         let rec = null;
         $("#fn-mic").onclick = () => {
-          if (rec) { rec.stop(); rec = null; $("#fn-mic").textContent = "🎤 گفتار به متن (فارسی)"; return; }
-          rec = new SR(); rec.lang = "fa-IR"; rec.continuous = true; rec.interimResults = false;
+          if (rec) { rec.stop(); rec = null; $("#fn-mic").textContent = MIC_LABEL; return; }
+          rec = new SR(); rec.lang = IS_FA ? "fa-IR" : "en-US"; rec.continuous = true; rec.interimResults = false;
           rec.onresult = e => { const t = [...e.results].map(r => r[0].transcript).join(" "); $("#fn-exp").value += ($("#fn-exp").value ? " " : "") + t; };
-          rec.onend = () => { rec = null; if ($("#fn-mic")) $("#fn-mic").textContent = "🎤 گفتار به متن (فارسی)"; };
-          rec.start(); $("#fn-mic").textContent = "⏹ توقف ضبط";
+          rec.onend = () => { rec = null; if ($("#fn-mic")) $("#fn-mic").textContent = MIC_LABEL; };
+          rec.start(); $("#fn-mic").textContent = tr("⏹ توقف ضبط", "⏹ Stop recording");
         };
       }
       $("#fn-go").onclick = async () => {
-        const b = $("#fn-go"); b.disabled = true; b.textContent = "در حال تحلیل دقیق توضیح تو…";
+        const b = $("#fn-go"); b.disabled = true; b.textContent = tr("در حال تحلیل دقیق توضیح تو…", "Analyzing your explanation…");
         try {
           const r = await api(`/api/books/${bookId}/feynman`, { method: "POST", body: { page, topic: $("#fn-topic").value, explanation: $("#fn-exp").value } });
           refreshUsage();
           renderFeynman(body, page);
-        } catch (e) { toast(e.message, true); b.disabled = false; b.textContent = "بررسی شکاف‌های فهم من"; }
+        } catch (e) { toast(e.message, true); b.disabled = false; b.textContent = tr("بررسی شکاف‌های فهم من", "Find gaps in my understanding"); }
       };
       $$("[data-go]", body).forEach(b => b.onclick = () => { closeOverlay(); goPage(+b.dataset.go); });
     }
@@ -582,14 +583,14 @@ window.Deep = (() => {
       return `<div class="card fn-card">
         <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
           <b>${esc(it.topic)}</b>
-          <span class="pill ${sc >= 75 ? "ollama" : sc >= 50 ? "cli2api" : "err"}">امتیاز فهم: ${fa(sc)} / ۱۰۰</span>
+          <span class="pill ${sc >= 75 ? "ollama" : sc >= 50 ? "cli2api" : "err"}">${tr(`امتیاز فهم: ${fa(sc)} / ۱۰۰`, `Understanding: ${fa(sc)} / 100`)}</span>
         </div>
         <p class="small muted">${esc(it.explanation)}</p>
-        ${(fb.clear_parts || []).length ? `<div><b class="small">✅ درست و شفاف گفتی:</b><ul>${fb.clear_parts.map(x => `<li>${esc(x)}</li>`).join("")}</ul></div>` : ""}
-        ${(fb.gaps || []).length ? `<div><b class="small" style="color:var(--danger)">⚠️ شکاف‌ها و جاافتاده‌ها:</b><ul>${fb.gaps.map(g => `<li>${esc(g.missing)}${g.book_quote ? `<div class="small muted" dir="auto">«${esc(g.book_quote)}»</div>` : ""}${g.page ? ` <button class="linkbtn" data-go="${g.page}">ص ${fa(g.page)}</button>` : ""}</li>`).join("")}</ul></div>` : ""}
-        ${(fb.hidden_assumptions || []).length ? `<div><b class="small">🔍 پیش‌فرض‌های پنهان:</b><ul>${fb.hidden_assumptions.map(x => `<li>${esc(x)}</li>`).join("")}</ul></div>` : ""}
-        ${fb.simpler_analogy ? `<div class="deep-box"><b>قیاس طلایی:</b> ${esc(fb.simpler_analogy)}</div>` : ""}
-        ${fb.next_step ? `<p class="small"><b>قدم بعدی:</b> ${esc(fb.next_step)}</p>` : ""}
+        ${(fb.clear_parts || []).length ? `<div><b class="small">${tr(`✅ درست و شفاف گفتی:`, `✅ What you got right:`)}</b><ul>${fb.clear_parts.map(x => `<li>${esc(x)}</li>`).join("")}</ul></div>` : ""}
+        ${(fb.gaps || []).length ? `<div><b class="small" style="color:var(--danger)">${tr(`⚠️ شکاف‌ها و جاافتاده‌ها:`, `⚠️ Gaps and omissions:`)}</b><ul>${fb.gaps.map(g => `<li>${esc(g.missing)}${g.book_quote ? `<div class="small muted" dir="auto">«${esc(g.book_quote)}»</div>` : ""}${g.page ? ` <button class="linkbtn" data-go="${g.page}">${tr("ص", "p.")} ${fa(g.page)}</button>` : ""}</li>`).join("")}</ul></div>` : ""}
+        ${(fb.hidden_assumptions || []).length ? `<div><b class="small">${tr(`🔍 پیش‌فرض‌های پنهان:`, `🔍 Hidden assumptions:`)}</b><ul>${fb.hidden_assumptions.map(x => `<li>${esc(x)}</li>`).join("")}</ul></div>` : ""}
+        ${fb.simpler_analogy ? `<div class="deep-box"><b>${tr(`قیاس طلایی:`, `Best analogy:`)}</b> ${esc(fb.simpler_analogy)}</div>` : ""}
+        ${fb.next_step ? `<p class="small"><b>${tr(`قدم بعدی:`, `Next step:`)}</b> ${esc(fb.next_step)}</p>` : ""}
       </div>`;
     }
 
@@ -597,11 +598,11 @@ window.Deep = (() => {
       const d = await api(`/api/books/${bookId}/critique?page=${page}`);
       if (!d.critique) {
         body.innerHTML = `<div class="ov-cta" style="position:static;min-height:50vh">
-          <b>وکیل مدافع شیطان و نقد «${esc(d.label)}»</b>
-          <span class="small muted">قوی‌ترین صورت استدلال نویسنده (Steelman) + محکم‌ترین نقدها، نقاط کور و دیدگاه‌های رقیب.</span>
-          <button class="btn go" id="cr-go">⚖️ به چالش کشیدن این فصل</button></div>`;
+          <b>${tr(`وکیل مدافع شیطان و نقد «${esc(d.label)}»`, `Devil's advocate: critique of “${esc(trS(d.label))}”`)}</b>
+          <span class="small muted">${tr(`قوی‌ترین صورت استدلال نویسنده (Steelman) + محکم‌ترین نقدها، نقاط کور و دیدگاه‌های رقیب.`, `The strongest form of the author's argument (steelman), plus the strongest critiques, blind spots and rival views.`)}</span>
+          <button class="btn go" id="cr-go">${tr(`⚖️ به چالش کشیدن این فصل`, `⚖️ Challenge this chapter`)}</button></div>`;
         $("#cr-go").onclick = async () => {
-          body.innerHTML = `<div class="ov-cta" style="position:static;min-height:50vh"><span class="pill busy">در حال بررسی نقاط کور و نقدها…</span></div>`;
+          body.innerHTML = `<div class="ov-cta" style="position:static;min-height:50vh"><span class="pill busy">${tr(`در حال بررسی نقاط کور و نقدها…`, `Looking for blind spots and critiques…`)}</span></div>`;
           try { await api(`/api/books/${bookId}/critique?page=${page}`, { method: "POST" }); refreshUsage(); renderCritique(body, page); }
           catch (e) { body.innerHTML = `<div class="error-box" style="margin:20px">${esc(e.message)}</div>`; }
         };
@@ -609,21 +610,21 @@ window.Deep = (() => {
       }
       const c = d.critique;
       body.innerHTML = `<div class="deep-page">
-        <div class="dp-top"><div><span class="eyebrow-s">وکیل مدافع شیطان · ص ${fa(d.start)} تا ${fa(d.end)}</span><h2>${esc(d.label)}</h2></div>
-          <div style="display:flex;gap:8px;align-items:center">${providerPill(c.provider, c.model)}<button class="btn sm ghost" id="cr-redo">نقد دوباره</button></div></div>
-        <div class="deep-hero"><span class="eyebrow-s">قوی‌ترین صورت استدلال نویسنده (Steelman)</span><p>${esc(c.steelman)}</p></div>
-        <div class="card"><h3>قوی‌ترین نقدها و دیدگاه‌های رقیب</h3>
+        <div class="dp-top"><div><span class="eyebrow-s">${tr(`وکیل مدافع شیطان · ص ${fa(d.start)} تا ${fa(d.end)}`, `Devil's advocate · pp. ${fa(d.start)}–${fa(d.end)}`)}</span><h2>${esc(trS(d.label))}</h2></div>
+          <div style="display:flex;gap:8px;align-items:center">${providerPill(c.provider, c.model)}<button class="btn sm ghost" id="cr-redo">${tr("نقد دوباره", "Critique again")}</button></div></div>
+        <div class="deep-hero"><span class="eyebrow-s">${tr(`قوی‌ترین صورت استدلال نویسنده (Steelman)`, `The author's argument at its strongest (steelman)`)}</span><p>${esc(c.steelman)}</p></div>
+        <div class="card"><h3>${tr(`قوی‌ترین نقدها و دیدگاه‌های رقیب`, `Strongest critiques and rival views`)}</h3>
           <div class="cr-list">${(c.counterarguments || []).map(a => `<div class="cr-item">
-            <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><b>${esc(a.point)}</b><span class="pill openai">${esc(a.thinker || "دیدگاه رقیب")}</span></div>
+            <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><b>${esc(a.point)}</b><span class="pill openai">${esc(a.thinker || tr("دیدگاه رقیب", "Rival view"))}</span></div>
             <p class="small">${esc(a.detail)}</p></div>`).join("")}</div></div>
         <div class="dp-grid">
-          <div class="card"><h3>نقاط کور و پیش‌فرض‌ها</h3><ul>${(c.blind_spots || []).map(x => `<li>${esc(x)}</li>`).join("")}</ul></div>
-          <div class="card"><h3>تعمیم‌های بیش از حد</h3><ul>${(c.overgeneralizations || []).map(x => `<li>${esc(x)}</li>`).join("")}</ul></div>
+          <div class="card"><h3>${tr(`نقاط کور و پیش‌فرض‌ها`, `Blind spots and assumptions`)}</h3><ul>${(c.blind_spots || []).map(x => `<li>${esc(x)}</li>`).join("")}</ul></div>
+          <div class="card"><h3>${tr(`تعمیم‌های بیش از حد`, `Overgeneralizations`)}</h3><ul>${(c.overgeneralizations || []).map(x => `<li>${esc(x)}</li>`).join("")}</ul></div>
         </div>
-        ${c.reflection_question ? `<div class="deep-box"><b>سؤال برای داوری خودت:</b> ${esc(c.reflection_question)}</div>` : ""}
+        ${c.reflection_question ? `<div class="deep-box"><b>${tr(`سؤال برای داوری خودت:`, `A question for your own judgment:`)}</b> ${esc(c.reflection_question)}</div>` : ""}
       </div>`;
       $("#cr-redo").onclick = async () => {
-        body.innerHTML = `<div class="ov-cta" style="position:static;min-height:50vh"><span class="pill busy">در حال نقد دوباره…</span></div>`;
+        body.innerHTML = `<div class="ov-cta" style="position:static;min-height:50vh"><span class="pill busy">${tr(`در حال نقد دوباره…`, `Critiquing again…`)}</span></div>`;
         await api(`/api/books/${bookId}/critique?page=${page}`, { method: "POST" }); refreshUsage(); renderCritique(body, page);
       };
     }
@@ -632,11 +633,11 @@ window.Deep = (() => {
       const d = await api(`/api/books/${bookId}/concepts?scope=chapter&page=${page}`);
       if (!d.graph) {
         body.innerHTML = `<div class="ov-cta" style="position:static;min-height:50vh">
-          <b>گراف مفاهیم و استدلال‌های «${esc(d.label)}»</b>
-          <span class="small muted">به‌جای اسم‌های خاص، مفاهیم، ادعاها، شواهد و رابطه‌های منطقی (حمایت، نقض، علیت، پیش‌نیاز) را استخراج می‌کند.</span>
-          <button class="btn go" id="cg-go">🕸️ ساخت گراف مفاهیم</button></div>`;
+          <b>${tr(`گراف مفاهیم و استدلال‌های «${esc(d.label)}»`, `Concepts and arguments in “${esc(trS(d.label))}”`)}</b>
+          <span class="small muted">${tr(`به‌جای اسم‌های خاص، مفاهیم، ادعاها، شواهد و رابطه‌های منطقی (حمایت، نقض، علیت، پیش‌نیاز) را استخراج می‌کند.`, `Instead of proper names, extracts concepts, claims, evidence and the logical relations between them (supports, contradicts, causes, depends on).`)}</span>
+          <button class="btn go" id="cg-go">${tr(`🕸️ ساخت گراف مفاهیم`, `🕸️ Build concept graph`)}</button></div>`;
         $("#cg-go").onclick = async () => {
-          body.innerHTML = `<div class="ov-cta" style="position:static;min-height:50vh"><span class="pill busy">در حال استخراج مفاهیم و استدلال‌ها…</span></div>`;
+          body.innerHTML = `<div class="ov-cta" style="position:static;min-height:50vh"><span class="pill busy">${tr(`در حال استخراج مفاهیم و استدلال‌ها…`, `Extracting concepts and arguments…`)}</span></div>`;
           try { await api(`/api/books/${bookId}/concepts?scope=chapter&page=${page}`, { method: "POST" }); refreshUsage(); renderConcepts(body, page); }
           catch (e) { body.innerHTML = `<div class="error-box" style="margin:20px">${esc(e.message)}</div>`; }
         };
@@ -644,9 +645,9 @@ window.Deep = (() => {
       }
       const g = d.graph;
       const KIND_META = {
-        concept: ["مفهوم", "#2159A0"], claim: ["ادعا", "#B23A5B"], evidence: ["شاهد/مثال", "#2D7A57"], question: ["سؤال", "#C0841A"]
+        concept: [tr("مفهوم", "Concept"), "#2159A0"], claim: [tr("ادعا", "Claim"), "#B23A5B"], evidence: [tr("شاهد/مثال", "Evidence/example"), "#2D7A57"], question: [tr("سؤال", "Question"), "#C0841A"]
       };
-      const REL_FA = { supports: "حمایت می‌کند", contradicts: "نقض می‌کند", depends_on: "وابسته است به", causes: "باعث می‌شود", example_of: "مثالی از" };
+      const REL_FA = { supports: tr("حمایت می‌کند", "supports"), contradicts: tr("نقض می‌کند", "contradicts"), depends_on: tr("وابسته است به", "depends on"), causes: tr("باعث می‌شود", "causes"), example_of: tr("مثالی از", "example of") };
       const REL_CLR = { supports: "#2D7A57", contradicts: "#B3261E", depends_on: "#2159A0", causes: "#C0841A", example_of: "#6A4BA6" };
 
       // Circular layout SVG for instant clarity + interactive detail cards below
@@ -674,29 +675,29 @@ window.Deep = (() => {
       </svg>`;
 
       body.innerHTML = `<div class="deep-page">
-        <div class="dp-top"><div><span class="eyebrow-s">گراف مفاهیم و استدلال‌ها · ص ${fa(d.start)} تا ${fa(d.end)}</span><h2>${esc(d.label)}</h2></div>
-          <div style="display:flex;gap:8px;align-items:center">${providerPill(g.provider, g.model)}<button class="btn sm ghost" id="cg-redo">ساخت دوباره</button></div></div>
+        <div class="dp-top"><div><span class="eyebrow-s">${tr(`گراف مفاهیم و استدلال‌ها · ص ${fa(d.start)} تا ${fa(d.end)}`, `Concept & argument graph · pp. ${fa(d.start)}–${fa(d.end)}`)}</span><h2>${esc(trS(d.label))}</h2></div>
+          <div style="display:flex;gap:8px;align-items:center">${providerPill(g.provider, g.model)}<button class="btn sm ghost" id="cg-redo">${tr("ساخت دوباره", "Rebuild")}</button></div></div>
         <div class="card" style="padding:10px">${svg}<div id="cg-detail" class="deep-box" hidden></div></div>
         <div class="dp-grid">${g.nodes.map(n => {
           const km = KIND_META[n.kind] || KIND_META.concept;
           return `<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;gap:6px">
             <b>${esc(n.label)}</b><span class="pill" style="background:${km[1]}22;color:${km[1]}">${km[0]}</span></div>
             <p class="small muted">${esc(n.summary)}</p>
-            ${n.page ? `<button class="linkbtn small" data-go="${n.page}">رفتن به ص ${fa(n.page)}</button>` : ""}</div>`;
+            ${n.page ? `<button class="linkbtn small" data-go="${n.page}">${tr(`رفتن به ص ${fa(n.page)}`, `Go to p. ${fa(n.page)}`)}</button>` : ""}</div>`;
         }).join("")}</div>
       </div>`;
       $$(".cgn", body).forEach(el => el.onclick = () => {
         const n = g.nodes.find(x => x.id === el.dataset.nid); if (!n) return;
         const rels = g.edges.filter(e => e.from === n.id || e.to === n.id).map(e => {
           const other = g.nodes.find(x => x.id === (e.from === n.id ? e.to : e.from));
-          return `<li><b>${esc(REL_FA[e.relation] || e.relation)}</b> (${esc(e.label)}) ← ${esc(other?.label || "")}</li>`;
+          return `<li><b>${esc(REL_FA[e.relation] || e.relation)}</b> (${esc(e.label)}) ${IS_FA ? "←" : "→"} ${esc(other?.label || "")}</li>`;
         }).join("");
         const det = $("#cg-detail"); det.hidden = false;
         det.innerHTML = `<b>${esc(n.label)}</b><p class="small">${esc(n.summary)}</p>${rels ? `<ul class="small">${rels}</ul>` : ""}`;
       });
       $$("[data-go]", body).forEach(b => b.onclick = () => { closeOverlay(); goPage(+b.dataset.go); });
       $("#cg-redo").onclick = async () => {
-        body.innerHTML = `<div class="ov-cta" style="position:static;min-height:50vh"><span class="pill busy">در حال ساخت دوباره…</span></div>`;
+        body.innerHTML = `<div class="ov-cta" style="position:static;min-height:50vh"><span class="pill busy">${tr(`در حال ساخت دوباره…`, `Rebuilding…`)}</span></div>`;
         await api(`/api/books/${bookId}/concepts?scope=chapter&page=${page}`, { method: "POST" }); refreshUsage(); renderConcepts(body, page);
       };
     }
@@ -715,7 +716,7 @@ window.Deep = (() => {
       active = !active;
       btn.classList.toggle("primary", active);
       imgWrap.classList.toggle("selecting", active);
-      if (active) toast("روی نمودار یا فرمول در تصویر صفحه کادر بکش");
+      if (active) toast(tr("روی نمودار یا فرمول در تصویر صفحه کادر بکش", "Drag a box around a chart or formula on the page image"));
     };
     imgWrap.onpointerdown = e => {
       if (!active) return;
@@ -738,7 +739,7 @@ window.Deep = (() => {
         const rect = JSON.parse(box.dataset.rect || "{}");
         if (!rect.w || rect.w < 0.03 || rect.h < 0.03) { box.remove(); return; }
         active = false; btn.classList.remove("primary"); imgWrap.classList.remove("selecting");
-        out.hidden = false; out.innerHTML = `<span class="pill busy">در حال تحلیل نمودار / فرمول…</span>`;
+        out.hidden = false; out.innerHTML = `<span class="pill busy">${tr(`در حال تحلیل نمودار / فرمول…`, `Analyzing chart / formula…`)}</span>`;
         try {
           const res = await api(`/api/books/${bookId}/pages/${page}/analyze-region`, { method: "POST", body: rect });
           renderInteractiveRegionCard(out, res);
@@ -753,7 +754,7 @@ window.Deep = (() => {
     const c = res.card;
     if (!c) {
       out.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-        <b>تحلیل بخش انتخاب‌شده</b>${providerPill(res.provider, res.model)}</div>${renderMd(res.text)}`;
+        <b>${tr(`تحلیل بخش انتخاب‌شده`, `Analysis of the selected region`)}</b>${providerPill(res.provider, res.model)}</div>${renderMd(res.text)}`;
       hydratePlots(out);
       return;
     }
@@ -761,23 +762,23 @@ window.Deep = (() => {
     const exs = Array.isArray(c.exercises) ? c.exercises : [];
     out.innerHTML = `<div class="ilab">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
-        <b style="font-size:1rem">🧪 ${esc(c.title || "آزمایشگاه تعاملی فرمول")}</b>
+        <b style="font-size:1rem">🧪 ${esc(c.title || tr("آزمایشگاه تعاملی فرمول", "Interactive formula lab"))}</b>
         ${providerPill(res.provider, res.model)}
       </div>
       ${c.formula_latex ? `<div class="md-katex-display" dir="ltr">${renderTex(c.formula_latex, true)}</div>` : ""}
       <div class="ilab-simple">${renderMd(c.simple_explain || "")}</div>
-      ${c.analogy ? `<div class="ilab-analogy"><b>💡 مثال روزمره:</b> ${renderMd(c.analogy)}</div>` : ""}
+      ${c.analogy ? `<div class="ilab-analogy"><b>${tr(`💡 مثال روزمره:`, `💡 Everyday example:`)}</b> ${renderMd(c.analogy)}</div>` : ""}
       ${syms.length ? `<div class="ilab-syms">
-        <span class="small muted">روی هر نماد بزن تا نقشش را ببینی:</span>
+        <span class="small muted">${tr(`روی هر نماد بزن تا نقشش را ببینی:`, `Tap a symbol to see what it does:`)}</span>
         <div class="sym-chips">${syms.map((s, i) => `<button class="sym-chip ${i === 0 ? "on" : ""}" data-si="${i}"><span dir="ltr">${renderTex(s.sym, false)}</span> <small>${esc(s.name || "")}</small></button>`).join("")}</div>
         <div class="sym-desc" id="sym-desc"><b>${esc(syms[0].name || "")}:</b> ${renderMd(syms[0].meaning || "")}</div>
       </div>` : ""}
       ${c.interactive_plot ? `<div id="ilab-plot"></div>` : ""}
-      ${exs.length ? `<div class="ilab-exs"><b>✏️ تمرین سریع (ببین واقعاً جا افتاد؟)</b>${exs.map((ex, ei) => `
+      ${exs.length ? `<div class="ilab-exs"><b>${tr(`✏️ تمرین سریع (ببین واقعاً جا افتاد؟)`, `✏️ Quick check (did it really click?)`)}</b>${exs.map((ex, ei) => `
         <div class="iex" data-ei="${ei}">
           <div class="iex-q">${fa(ei + 1)}. ${renderMd(ex.q || "")}</div>
           <div class="iex-opts">${(ex.options || []).map((opt, oi) => `<button class="iex-opt" data-oi="${oi}">${renderMd(opt)}</button>`).join("")}</div>
-          <div class="row-acts"><button class="btn sm ghost" data-hint>💡 راهنمایی</button></div>
+          <div class="row-acts"><button class="btn sm ghost" data-hint>${tr(`💡 راهنمایی`, `💡 Hint`)}</button></div>
           <div class="iex-hint small muted" hidden>${renderMd(ex.hint || "")}</div>
           <div class="iex-fb" hidden></div>
         </div>`).join("")}</div>` : ""}
@@ -798,7 +799,7 @@ window.Deep = (() => {
         btn.classList.add(ok ? "ok" : "bad");
         const fb = $(".iex-fb", box); fb.hidden = false;
         fb.className = "iex-fb " + (ok ? "ok" : "bad");
-        fb.innerHTML = `<b>${ok ? "✅ آفرین! دقیقاً درسته." : "❌ دوباره نگاه کن — جواب درست:"}</b> ${renderMd(ex.solution || "")}`;
+        fb.innerHTML = `<b>${ok ? tr("✅ آفرین! دقیقاً درسته.", "✅ Exactly right!") : tr("❌ دوباره نگاه کن — جواب درست:", "❌ Look again — the right answer:")}</b> ${renderMd(ex.solution || "")}`;
       });
     });
   }

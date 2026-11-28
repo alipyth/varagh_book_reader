@@ -14,10 +14,10 @@ PORT = int(os.environ.get("VARAGH_PORT", "8765"))
 
 if __name__ == "__main__":
     url = f"http://127.0.0.1:{PORT}"
-    print(f"\n  ورق اجرا شد → {url}")
-    if HOST == "0.0.0.0":
-        print("  دسترسی از گوشی روشن است؛ لینک و QR در صفحه‌ی تنظیمات است.")
-    print("  (برای توقف Ctrl+C)\n")
+    print(f"\n  Varagh is running → {url}")
+    if HOST == "0.0.0.0" and not os.environ.get("VARAGH_TRUST_ALL"):
+        print("  Phone access is on; the link and QR code are on the Settings page.")
+    print("  (Ctrl+C to stop)\n")
     from backend.api import app
     app.state.bound_host = HOST
     if "--no-browser" not in sys.argv:

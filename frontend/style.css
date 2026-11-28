@@ -177,7 +177,7 @@ p {
 }
 
 .en,
-[dir=ltr] {
+[dir=ltr]:not(html) {
   font-family: var(--f-en)
 }
 
@@ -3978,3 +3978,22 @@ code.url {
 .iex-fb { padding: 8px 10px; border-radius: 8px; font-size: .84rem; }
 .iex-fb.ok { background: var(--local-soft); color: var(--local); }
 .iex-fb.bad { background: var(--danger-soft); color: var(--danger); }
+
+/* ---------------------------------------------------------------- English (LTR) interface
+   The bilingual reading sheet keeps its original layout (Persian column on the right),
+   UI controls inside it run left-to-right, and any Persian content elsewhere picks its
+   own direction per paragraph. */
+html[dir=ltr] .sheet,
+html[dir=ltr] .split {
+  direction: rtl
+}
+
+html[dir=ltr] .sheet :is(.acts, .dexp-bar, .cta, .page-meta, .chend, .hm-badge, .explain > b, .explain.ask, .todo, .err),
+html[dir=ltr] .split :is(.img-pane, .origs > summary, .cta, .page-meta, .chend) {
+  direction: ltr
+}
+
+html[dir=ltr] :is(p, li, td, th, blockquote, h1, h2, h3, h4, label, textarea, input:not([type=number]):not([type=range]),
+  .tbub, .mean, .front, .back, .ctx, .cg-q, .cg-a, .lab, .wl, .sym-desc, .iex-q, .iex-opt, .rname, .rfa, .ren, .snip, .wsnip, .qq) {
+  unicode-bidi: plaintext
+}
